@@ -16,5 +16,5 @@ class CloudInferenceRequest(BaseModel):
     
     # Knowledge retrieval parameters for hybrid architecture
     enable_l0_retrieval: bool = False  # Enable L0 knowledge retrieval
-    enable_l1_retrieval: bool = False  # Enable L1 knowledge retrieval
+    enable_l1_retrieval: bool = False  # Enable stage2 knowledge retrieval
     role_id: Optional[str] = None  # Role ID for role-based retrieval

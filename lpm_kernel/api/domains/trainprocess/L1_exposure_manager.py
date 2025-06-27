@@ -9,7 +9,7 @@ from lpm_kernel.common.repository.database_session import DatabaseSession
 # Output file mapping for each process step
 output_files = {
     "extract_dimensional_topics": os.path.join(os.getcwd(), "resources/L2/data_pipeline/raw_data/topics.json"),
-    "map_your_entity_network": os.path.join(os.getcwd(), "resources/L1/graphrag_indexing_output/subjective/entities.parquet"),
+    "map_your_entity_network": os.path.join(os.getcwd(), "resources/stage2/graphrag_indexing_output/subjective/entities.parquet"),
     "decode_preference_patterns": os.path.join(os.getcwd(), "resources/L2/data/preference.json"),
     "reinforce_identity": os.path.join(os.getcwd(), "resources/L2/data/selfqa.json"),
     "augment_content_retention": os.path.join(os.getcwd(), "resources/L2/data/diversity.json"),
@@ -17,7 +17,7 @@ output_files = {
 
 def query_l1_version_data(version: int) -> dict:
     """
-    Query L1 bio and shades for a given version and return as dict.
+    Query stage2 bio and shades for a given version and return as dict.
     """
     with DatabaseSession.session() as session:
             # Get all data for this version

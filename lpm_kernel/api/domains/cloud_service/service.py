@@ -37,7 +37,7 @@ class CloudService:
         self.job_id = None
         self.model_id = None  # ID of the fine-tuned model
 
-    def upload_training_file(self, file_path = "resources/L2/data/merged.json", description=None):
+    def upload_training_file(self, file_path = "resources/data/merged.json", description=None):
         """Upload training data file"""
         url = f"{self.base_url}/files"
 

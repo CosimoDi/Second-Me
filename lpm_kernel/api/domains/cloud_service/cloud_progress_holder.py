@@ -33,28 +33,28 @@ class CloudProgress:
                     "current_step": None,
                     "steps": [
                         {
-                            "name": "list_documents",
+                            "name": "List Documents",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": False,
                             "path": None
                         },
                         {
-                            "name": "generate_document_embeddings",
+                            "name": "Generate Document Embeddings",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": False,
                             "path": None
                         },
                         {
-                            "name": "process_chunks",
+                            "name": "Process Chunks",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": False,
                             "path": None
                         },
                         {
-                            "name": "chunk_embedding",
+                            "name": "Chunk Embedding",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": False,
@@ -69,54 +69,119 @@ class CloudProgress:
                     "current_step": None,
                     "steps": [
                         {
-                            "name": "extract_dimensional_topics",
+                            "name": "Extract Dimensional Topics",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": True,
                             "path": "resources/L2/data_pipeline/raw_data/topics.json"
                         },
                         {
-                            "name": "generate_biography",
+                            "name": "Generate Shades",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": True,
                             "path": "From database"
                         },
                         {
-                            "name": "map_your_entity_network",
+                            "name": "Generate Biography",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": True,
-                            "path": "resources/L1/graphrag_indexing_output/subjective/entities.parquet"
+                            "path": "From database"
                         }
                     ]
                 },
                 {
-                    "name": "Prepare Training Data for Deep Comprehension",
+                    "name": "Memory Reconstruction",
+                    "progress": 0.0,
+                    "status": "pending",
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "Generate Base",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/data/stage1/final.json"
+                        },
+                    ]
+                },
+                {
+                    "name": "Deep Comprehension",
                     "progress": 0.0,
                     "status": CloudStatus.PENDING,
                     "current_step": None,
                     "steps": [
                         {
-                            "name": "decode_preference_patterns",
+                            "name": "Bio QA Generation",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": True,
-                            "path": "resources/L2/data/preference.json"
+                            "path": "resources/data/stage2/processed/stage2_qa.json"
                         },
                         {
-                            "name": "reinforce_identity",
+                            "name": "Wiki Data Generation",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": True,
-                            "path": "resources/L2/data/selfqa.json"
+                            "path": "resources/data/stage2/wiki/wiki_res.json"
                         },
                         {
-                            "name": "augment_content_retention",
+                            "name": "Generate MemQA Entity",
                             "completed": False,
                             "status": CloudStatus.PENDING,
                             "have_output": True,
-                            "path": "resources/L2/data/diversity.json"
+                            "path": "resources/data/stage2/processed/subjective_entity.json"
+                        },
+                        {
+                            "name": "Generate MemQA Relation",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/data/stage2/processed/subjective_relation.json"
+                        },
+                        {
+                            "name": "Generate MemQA Description",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/data/stage2/processed/subjective_description.json"
+                        },
+                        {
+                            "name": "Generate MemQA Diversity",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/data/stage2/processed/diversity.json"
+                        }
+                    ]
+                },
+                {
+                    "name": "Memory Expansion",
+                    "progress": 0.0,
+                    "status": CloudStatus.PENDING,
+                    "current_step": None,
+                    "steps": [
+                        {
+                            "name": "Synthetic Data Generation",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/data/stage3/synthetic_data_with_notes_answers.json"
+                        },
+                        {
+                            "name": "Synthetic No Notes Data Generation",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/data/stage3/synthetic_data_no_notes_answers.json"
+                        },
+                        {
+                            "name": "Convert Data",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/data/merged.json"
                         }
                     ]
                 },
@@ -180,12 +245,21 @@ class CloudProgress:
             ProcessStep.CHUNK_EMBEDDING: "activating_the_memory_matrix",
 
             ProcessStep.EXTRACT_DIMENSIONAL_TOPICS: "synthesize_your_life_narrative",
+            ProcessStep.GENERATE_SHADES: "synthesize_your_life_narrative",
             ProcessStep.GENERATE_BIOGRAPHY: "synthesize_your_life_narrative",
-            ProcessStep.MAP_ENTITY_NETWORK: "synthesize_your_life_narrative",
 
-            ProcessStep.DECODE_PREFERENCE_PATTERNS: "prepare_training_data_for_deep_comprehension",
-            ProcessStep.REINFORCE_IDENTITY: "prepare_training_data_for_deep_comprehension",
-            ProcessStep.AUGMENT_CONTENT_RETENTION: "prepare_training_data_for_deep_comprehension",
+            ProcessStep.GENERATE_BASE: "memory_reconstruction",
+
+            ProcessStep.BIO_QA_GENERATION: "deep_comprehension",
+            ProcessStep.WIKI_DATA_GENERATION: "deep_comprehension",
+            ProcessStep.GENERATE_MEMQA_ENTITY: "deep_comprehension",
+            ProcessStep.GENERATE_MEMQA_RELATION: "deep_comprehension",
+            ProcessStep.GENERATE_MEMQA_DESCRIPTION: "deep_comprehension",
+            ProcessStep.GENERATE_MEMQA_DIVERSITY: "deep_comprehension",
+
+            ProcessStep.SYNTHETIC_DATA_GENERATION: "memory_expansion",
+            ProcessStep.SYNTHETIC_NO_NOTES_DATA_GENERATION: "memory_expansion",
+            ProcessStep.CONVERT_DATA: "memory_expansion",
             
             CloudProcessStep.UPLOAD_TRAINING_DATA: "training_to_create_second_me",
             CloudProcessStep.CREATE_FINE_TUNE_JOB: "training_to_create_second_me",
