@@ -38,12 +38,21 @@ class TrainProgressHolder:
             ProcessStep.CHUNK_EMBEDDING: "activating_the_memory_matrix",
 
             ProcessStep.EXTRACT_DIMENSIONAL_TOPICS: "synthesize_your_life_narrative",
+            ProcessStep.GENERATE_SHADES: "synthesize_your_life_narrative",
             ProcessStep.GENERATE_BIOGRAPHY: "synthesize_your_life_narrative",
-            ProcessStep.MAP_ENTITY_NETWORK: "synthesize_your_life_narrative",
-
-            ProcessStep.DECODE_PREFERENCE_PATTERNS: "prepare_training_data_for_deep_comprehension",
-            ProcessStep.REINFORCE_IDENTITY: "prepare_training_data_for_deep_comprehension",
-            ProcessStep.AUGMENT_CONTENT_RETENTION: "prepare_training_data_for_deep_comprehension",
+            
+            ProcessStep.GENERATE_BASE: "memory_reconstruction",
+            
+            ProcessStep.BIO_QA_GENERATION: "deep_comprehension",
+            ProcessStep.WIKI_DATA_GENERATION: "deep_comprehension",
+            ProcessStep.GENERATE_MEMQA_ENTITY: "deep_comprehension",
+            ProcessStep.GENERATE_MEMQA_RELATION: "deep_comprehension",
+            ProcessStep.GENERATE_MEMQA_DESCRIPTION: "deep_comprehension",
+            ProcessStep.GENERATE_MEMQA_DIVERSITY: "deep_comprehension",
+            
+            ProcessStep.SYNTHETIC_DATA_GENERATION: "memory_expansion",
+            ProcessStep.SYNTHETIC_NO_NOTES_DATA_GENERATION: "memory_expansion",
+            ProcessStep.CONVERT_DATA: "memory_expansion",
 
             ProcessStep.TRAIN: "training_to_create_second_me",
             ProcessStep.MERGE_WEIGHTS: "training_to_create_second_me",

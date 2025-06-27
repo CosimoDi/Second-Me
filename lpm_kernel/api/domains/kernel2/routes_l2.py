@@ -13,8 +13,8 @@ from flask_pydantic import validate
 
 from lpm_kernel.models.memory import Memory
 from lpm_kernel.common.repository.database_session import DatabaseSession
-from lpm_kernel.L1.serializers import NotesStorage
-from lpm_kernel.L1.utils import save_true_topics
+from lpm_kernel.stage2.serializers import NotesStorage
+from lpm_kernel.stage2.utils import save_true_topics
 from lpm_kernel.L2.l2_generator import L2Generator
 from lpm_kernel.L2.utils import save_hf_model
 from lpm_kernel.api.common.responses import APIResponse
@@ -242,7 +242,7 @@ def all():
             )
             graph_path = os.path.join(
                 os.getcwd(),
-                "resources/L1/graphrag_indexing_output/subjective/entities.parquet",
+                "resources/stage2/graphrag_indexing_output/subjective/entities.parquet",
             )
 
             data_output_base_dir = os.path.join(os.getcwd(), "resources/L2/data")

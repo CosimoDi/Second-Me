@@ -1240,7 +1240,7 @@ export default function TrainingPage(): JSX.Element {
         {/* Always show training log regardless of training status */}
         {renderTrainingLog()}
 
-        {/* L1 and L2 Panels - show when training is complete or model is running */}
+        {/* stage2 and L2 Panels - show when training is complete or model is running */}
 
         <InfoModal
           content={

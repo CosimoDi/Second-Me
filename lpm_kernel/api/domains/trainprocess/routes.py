@@ -36,7 +36,7 @@ def start_process():
     4. Process document chunks
     5. Generate chunk embeddings
     6. Analyze documents
-    7. Generate L1
+    7. Generate stage2
     8. Download model
     9. Prepare data
     10. Train model
@@ -62,12 +62,12 @@ def start_process():
 
         model_name = data["model_name"]
         
-        # Get optional parameters with default values
+
         learning_rate = data.get("learning_rate", None)
         number_of_epochs = data.get("number_of_epochs", None)
         concurrency_threads = data.get("concurrency_threads", None)
         data_synthesis_mode = data.get("data_synthesis_mode", None)
-        use_cuda = data.get("use_cuda", False)  # Default to False if not provided
+        use_cuda = data.get("use_cuda", False)
         is_cot = data.get("is_cot", None)
         language = data.get("language", "en")
         
