@@ -743,7 +743,7 @@ class RegistryClient:
             icon: Icon URL
             instance_id: Instance ID
             enable_l0_retrieval: Enable L0 retrieval
-            enable_l1_retrieval: Enable L1 retrieval
+            enable_l1_retrieval: Enable stage2 retrieval
             
         Returns:
             dict: Created role data

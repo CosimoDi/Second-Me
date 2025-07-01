@@ -24,11 +24,10 @@ class TrainingParamsManager:
         "concurrency_threads": 2,
         "data_synthesis_mode": "high",
         "use_cuda": False,  # Default to using CUDA when available
-        "is_cot": False,
-        "language": "en"
+        "is_cot": True,
+        "language": "chinese"
     }
-    
-    # Parameters file path
+
     _params_file_path = None
     
     @classmethod

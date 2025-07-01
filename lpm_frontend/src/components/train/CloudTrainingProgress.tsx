@@ -369,7 +369,8 @@ const CloudTrainingProgress = (props: CloudTrainingProgressProps): JSX.Element |
                                 </div>
                               ) : stage.current_step &&
                                 formatUnderscoreToName(stage.current_step) ===
-                                  formatUnderscoreToName(step.name) ? (
+                                  formatUnderscoreToName(step.name) &&
+                                step.status !== 'pending' ? (
                                 <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center">
                                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                                 </div>
@@ -384,7 +385,8 @@ const CloudTrainingProgress = (props: CloudTrainingProgressProps): JSX.Element |
                                 'text-xs',
                                 stage.current_step &&
                                   formatUnderscoreToName(stage.current_step) ===
-                                    formatUnderscoreToName(step.name)
+                                    formatUnderscoreToName(step.name) &&
+                                  step.status !== 'pending'
                                   ? 'text-blue-600 font-medium'
                                   : 'text-gray-600'
                               )}

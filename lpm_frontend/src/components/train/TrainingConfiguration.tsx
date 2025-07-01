@@ -32,7 +32,7 @@ interface TrainingConfigurationProps {
   cudaAvailable: boolean;
   trainingType: 'local' | 'cloud';
   setTrainingType: (type: 'local' | 'cloud') => void;
-  cloudTrainingStatus?: 'idle' | 'training' | 'trained' | 'failed' | 'suspended';
+  cloudTrainingStatus?: 'idle' | 'training' | 'trained' | 'failed' | 'suspended' | 'pending';
   isPauseRequested?: boolean;
   pauseStatus?: 'success' | 'pending' | 'failed' | null;
 }

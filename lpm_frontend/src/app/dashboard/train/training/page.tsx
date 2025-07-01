@@ -1,34 +1,43 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import InfoModal from '@/components/InfoModal';
-import type { TrainingConfig, LocalTrainingParams, CloudTrainingParams, TrainingParamsResponse } from '@/service/train';
+import type {
+  TrainingConfig,
+  LocalTrainingParams,
+  CloudTrainingParams,
+  TrainingParamsResponse
+} from '@/service/train';
 import {
   startTrain,
   stopTrain,
   retrain,
   getTrainingParams,
   checkCudaAvailability,
-  resetProgress
+  resetProgress,
+  checkStopStatus
 } from '@/service/train';
 import {
   startCloudTraining,
   getCloudTrainingProgress,
   stopCloudTraining,
   resetCloudTrainingProgress,
-  resumeCloudTraining
+  checkCloudTrainingPauseStatus,
+  resumeCloudTraining,
+  checkCloudTrainingStopStatus
 } from '@/service/cloudService';
 import type { CloudProgressData } from '@/service/cloudService';
 import { useTrainingStore } from '@/store/useTrainingStore';
 import { getMemoryList } from '@/service/memory';
-import { message, Modal } from 'antd';
+import { message, Modal, Button } from 'antd';
 import { useModelConfigStore } from '@/store/useModelConfigStore';
 import CelebrationEffect from '@/components/Celebration';
 import TrainingLog from '@/components/train/TrainingLog';
 import TrainingProgress from '@/components/train/TrainingProgress';
 import TrainingConfiguration from '@/components/train/TrainingConfiguration';
 import { ROUTER_PATH } from '@/utils/router';
+
 interface TrainInfo {
   name: string;
   description: string;
@@ -94,6 +103,7 @@ export default function TrainingPage(): JSX.Element {
   const setStatus = useTrainingStore((state) => state.setStatus);
   const fetchModelConfig = useModelConfigStore((state) => state.fetchModelConfig);
   const modelConfig = useModelConfigStore((store) => store.modelConfig);
+  const thinkingModelConfig = useModelConfigStore((store) => store.thinkingModelConfig);
   const status = useTrainingStore((state) => state.status);
   const trainingProgress = useTrainingStore((state) => state.trainingProgress);
   const serviceStarted = useTrainingStore((state) => state.serviceStarted);
@@ -103,17 +113,25 @@ export default function TrainingPage(): JSX.Element {
   const [selectedInfo, setSelectedInfo] = useState<boolean>(false);
   const isTraining = useTrainingStore((state) => state.isTraining);
   const setIsTraining = useTrainingStore((state) => state.setIsTraining);
-  const [localTrainingParams, setLocalTrainingParams] = useState<LocalTrainingParams>({} as LocalTrainingParams);
-  const [cloudTrainingParams, setCloudTrainingParams] = useState<CloudTrainingParams>({} as CloudTrainingParams);
+  const [localTrainingParams, setLocalTrainingParams] = useState<LocalTrainingParams>(
+    {} as LocalTrainingParams
+  );
+  const [cloudTrainingParams, setCloudTrainingParams] = useState<CloudTrainingParams>(
+    {} as CloudTrainingParams
+  );
   const [trainActionLoading, setTrainActionLoading] = useState(false);
+  const [cloudTrainActionLoading, setCloudTrainActionLoading] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showMemoryModal, setShowMemoryModal] = useState(false);
 
   const [trainingType, setTrainingType] = useState<'local' | 'cloud'>('local');
+  const [isHydrated, setIsHydrated] = useState(false);
   const [cloudProgress, setCloudProgress] = useState<CloudProgressData | null>(null);
   const [cloudJobId, setCloudJobId] = useState<string | null>(null);
   const [cloudTrainSuspended, setCloudTrainSuspended] = useState(false);
-  const [cloudTrainingStatus, setCloudTrainingStatus] = useState<'idle' | 'training' | 'trained' | 'failed' | 'suspended'>('idle');
+  const [cloudTrainingStatus, setCloudTrainingStatus] = useState<
+    'idle' | 'training' | 'trained' | 'failed' | 'suspended' | 'pending'
+  >('idle');
   // Track pause request state to avoid state inconsistency
   const [isPauseRequested, setIsPauseRequested] = useState(false);
   // Track pause status polling
@@ -130,16 +148,31 @@ export default function TrainingPage(): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const firstLoadRef = useRef<boolean>(true);
   const pollingStopRef = useRef<boolean>(false);
-  const cloudPollingRef = useRef<NodeJS.Timeout | null>(null); 
+  const cloudPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const [cudaAvailable, setCudaAvailable] = useState<boolean>(false);
   const trainSuspended = useTrainingStore((state) => state.trainSuspended);
   const setTrainSuspended = useTrainingStore((state) => state.setTrainSuspended);
 
-  const startCloudTrainingPolling = () => {
+  // 检查 Think Model 配置是否完整
+  const thinkingConfigComplete = useMemo(() => {
+    return (
+      !!thinkingModelConfig?.thinking_model_name &&
+      !!thinkingModelConfig?.thinking_endpoint
+      // 不再检查 thinking_api_key
+    );
+  }, [thinkingModelConfig]);
+
+  const startCloudTrainingPolling = (isResume = false) => {
     setStatus('training');
     setIsTraining(true);
     pollingStopRef.current = false; // Reset polling stop flag
+    
+    // Only reset cloud progress if not resuming
+    if (!isResume) {
+      setCloudProgress(null);
+    }
+    
     pollCloudProgress();
   };
 
@@ -159,7 +192,7 @@ export default function TrainingPage(): JSX.Element {
           if (currentJobId) {
             setCloudJobId(currentJobId);
           }
-          
+
           // Handle different training statuses
           if (progressData.status === 'completed') {
             // Training completed successfully
@@ -167,7 +200,7 @@ export default function TrainingPage(): JSX.Element {
             setIsTraining(false);
             setCloudTrainSuspended(false);
             setCloudTrainingStatus('trained');
-            
+
             // Show celebration effect
             const hasShownTrainingComplete = localStorage.getItem('hasShownCloudTrainingComplete');
             if (hasShownTrainingComplete !== 'true') {
@@ -193,14 +226,14 @@ export default function TrainingPage(): JSX.Element {
             setIsTraining(false);
             setCloudTrainSuspended(true);
             setCloudTrainingStatus('suspended');
-            
+
             // Clear pause-related states if they exist
             if (pauseTimeoutRef.current) {
               clearTimeout(pauseTimeoutRef.current);
               pauseTimeoutRef.current = null;
             }
             setIsPauseRequested(false);
-            
+
             message.info('Cloud training is paused.');
             stopCloudPolling();
             return;
@@ -220,16 +253,20 @@ export default function TrainingPage(): JSX.Element {
         } else {
           // Handle API errors with intelligent retry
           if (pollingRetryCount < maxPollingRetries) {
-            setPollingRetryCount(prev => prev + 1);
-            message.warning(`Cloud training status check failed (${pollingRetryCount + 1}/${maxPollingRetries}). Retrying...`);
-            
+            setPollingRetryCount((prev) => prev + 1);
+            message.warning(
+              `Cloud training status check failed (${pollingRetryCount + 1}/${maxPollingRetries}). Retrying...`
+            );
+
             if (!pollingStopRef.current) {
               // Exponential backoff for retries
               const retryDelay = POLLING_INTERVAL * Math.pow(2, pollingRetryCount);
               cloudPollingRef.current = setTimeout(pollCloudProgress, retryDelay);
             }
           } else {
-            message.error(res.data.message || 'Failed to get cloud training progress after multiple retries');
+            message.error(
+              res.data.message || 'Failed to get cloud training progress after multiple retries'
+            );
             setPollingRetryCount(0);
             stopCloudPolling();
           }
@@ -237,19 +274,23 @@ export default function TrainingPage(): JSX.Element {
       })
       .catch((error) => {
         console.error('Error polling cloud training progress:', error);
-        
+
         // Handle network errors with intelligent retry
         if (pollingRetryCount < maxPollingRetries) {
-          setPollingRetryCount(prev => prev + 1);
-          message.warning(`Network error checking cloud training status (${pollingRetryCount + 1}/${maxPollingRetries}). Retrying...`);
-          
+          setPollingRetryCount((prev) => prev + 1);
+          message.warning(
+            `Network error checking cloud training status (${pollingRetryCount + 1}/${maxPollingRetries}). Retrying...`
+          );
+
           if (!pollingStopRef.current) {
             // Exponential backoff for retries
             const retryDelay = POLLING_INTERVAL * Math.pow(2, pollingRetryCount);
             cloudPollingRef.current = setTimeout(pollCloudProgress, retryDelay);
           }
         } else {
-          message.error('Unable to check cloud training status after multiple retries. Please refresh the page.');
+          message.error(
+            'Unable to check cloud training status after multiple retries. Please refresh the page.'
+          );
           setPollingRetryCount(0);
           stopCloudPolling();
         }
@@ -273,53 +314,65 @@ export default function TrainingPage(): JSX.Element {
 
     pausePollingRef.current = setTimeout(async () => {
       try {
-        const res = await stopCloudTraining();
-        
-        if (res.data.code === 0 && res.data.data) {
-          const status = res.data.data.status;
-          setPauseStatus(status);
-          
-          if (status === 'pending') {
-            // Continue polling if still pending
-            pollPauseStatus();
-          } else if (status === 'success') {
-            // Successfully stopped
-            setIsTraining(false);
-            setCloudTrainSuspended(true);
-            setCloudTrainingStatus('suspended');
-            setIsPauseRequested(false);
-            setPauseStatus(null);
-            stopCloudPolling();
-            message.success('Cloud training stopped successfully');
-          } else if (status === 'failed') {
-            // Failed to stop
-            setIsPauseRequested(false);
-            setPauseStatus(null);
-            message.error('Failed to stop cloud training');
-          }
-        } else {
-          // API error
+        const result = await stopCloudTraining();
+        const status = result.data.data.status;
+        setPauseStatus(status);
+
+        if (status === 'pending') {
+          // Continue polling if still pending
+          pollPauseStatus();
+        } else if (status === 'success') {
+          // Successfully stopped
+          setIsTraining(false);
+          setCloudTrainSuspended(true);
+          setCloudTrainingStatus('suspended');
           setIsPauseRequested(false);
           setPauseStatus(null);
-          message.error(res.data.message || 'Failed to check pause status');
+          stopCloudPolling();
+          message.success('Cloud training stopped successfully');
+
+          // Clear pause timeout if it exists
+          if (pauseTimeoutRef.current) {
+            clearTimeout(pauseTimeoutRef.current);
+            pauseTimeoutRef.current = null;
+          }
+        } else if (status === 'failed') {
+          // Failed to stop
+          setIsPauseRequested(false);
+          setPauseStatus(null);
+          setCloudTrainActionLoading(false);
+          message.error('Failed to stop cloud training');
+
+          // Clear pause timeout if it exists
+          if (pauseTimeoutRef.current) {
+            clearTimeout(pauseTimeoutRef.current);
+            pauseTimeoutRef.current = null;
+          }
         }
       } catch (error) {
         console.error('Error polling pause status:', error);
         setIsPauseRequested(false);
         setPauseStatus(null);
+        setCloudTrainActionLoading(false);
         message.error('Error checking pause status');
+
+        // Clear pause timeout if it exists
+        if (pauseTimeoutRef.current) {
+          clearTimeout(pauseTimeoutRef.current);
+          pauseTimeoutRef.current = null;
+        }
       }
-    }, 10000); // Poll every 10 seconds
+    }, 5000); // Poll every 5 seconds
   };
 
   // Check cloud training pause status on page load
   const checkCloudPauseStatus = async (): Promise<'pending' | 'success' | 'failed' | null> => {
     try {
-      const res = await stopCloudTraining();
-      
+      const res = await checkCloudTrainingPauseStatus();
+
       if (res.data.code === 0 && res.data.data) {
         const status = res.data.data.status;
-        
+
         if (status === 'pending') {
           // If pause is still pending, show the pending state and start polling
           setIsPauseRequested(true);
@@ -335,7 +388,9 @@ export default function TrainingPage(): JSX.Element {
           setIsPauseRequested(false);
           setPauseStatus(null);
           stopCloudPolling();
-          console.log('Previous pause operation completed successfully, UI updated to suspended state');
+          console.log(
+            'Previous pause operation completed successfully, UI updated to suspended state'
+          );
           return 'success';
         } else if (status === 'failed') {
           // Pause failed, clear any pending state
@@ -381,124 +436,23 @@ export default function TrainingPage(): JSX.Element {
       });
   }, []);
 
-  // Check cloud training progress on page load
-  const checkCloudTrainingProgress = async () => {
-    try {
-      const res = await getCloudTrainingProgress();
-      
-      if (res.data.code === 0) {
-        const progressData = res.data.data.progress;
-        const currentJobId = res.data.data.job_id;
-        
-        if (progressData) {
-          setCloudProgress(progressData);
-          
-          if (currentJobId) {
-            setCloudJobId(currentJobId);
-          }
-
-          // If training is in progress, check for pause status first
-          if (progressData.status === 'in_progress') {
-            setTrainingType('cloud');
-            console.log('Cloud training detected as in_progress, checking pause status...');
-            
-            // Check if there's a pending or completed pause operation first
-            const pauseStatus = await checkCloudPauseStatus();
-            console.log('Pause status check result:', pauseStatus);
-            
-            // If pause was successful or pending, don't start training flow
-            if (pauseStatus !== 'success' && pauseStatus !== 'pending') {
-              console.log('No active pause found, starting normal training flow...');
-              setIsTraining(true);
-              setStatus('training');
-              setCloudTrainSuspended(false);
-              setCloudTrainingStatus('training');
-              startCloudTrainingPolling();
-            } else {
-              console.log('Pause operation found, skipping training flow start');
-            }
-          } else if (progressData.status === 'completed') {
-            setTrainingType('cloud');
-            setStatus('trained');
-            setIsTraining(false);
-            setCloudTrainSuspended(false);
-            setCloudTrainingStatus('trained');
-          } else if (progressData.status === 'failed') {
-            setTrainingType('cloud');
-            setStatus('training'); // Keep as 'training' since ModelStatus doesn't have 'failed'
-            setIsTraining(false);
-            setCloudTrainSuspended(false);
-            setCloudTrainingStatus('failed');
-          } else if (progressData.status === 'suspended') {
-            setTrainingType('cloud');
-            setStatus('training');
-            setIsTraining(false);
-            setCloudTrainSuspended(true);
-            setCloudTrainingStatus('suspended');
-          }
-        }
-      }
-    } catch (error) {
-      // Silently handle errors for initial check - cloud training might not be active
-      console.log('No active cloud training found or error checking cloud progress:', error);
-    }
-  };
-
-  // Start polling training progress
-  const startPolling = () => {
-    if (pollingStopRef.current) {
-      return;
-    }
-
-    // Start new polling
-    checkTrainStatus()
-      .then(() => {
-        if (pollingStopRef.current) {
-          return;
-        }
-
-        setTimeout(() => {
-          startPolling();
-        }, POLLING_INTERVAL);
-      })
-      .catch((error) => {
-        console.error('Training status check failed:', error);
-        stopPolling(); // Stop polling when error occurs
-        setIsTraining(false);
-        message.error('Training status check failed, monitoring stopped');
-      });
-  };
-
-  const startGetTrainingProgress = () => {
-    pollingStopRef.current = false;
-    setStatus('training');
-    setIsTraining(true);
-    startPolling();
-  };
-
-  // Stop polling
-  const stopPolling = () => {
-    pollingStopRef.current = true;
-  };
-
+  // Handle hydration for client-side rendering
   useEffect(() => {
-    if (status === 'trained' || trainingError) {
-      stopPolling();
-      setIsTraining(false);
+    // Set hydrated state to true once component is mounted on client
+    setIsHydrated(true);
 
-      const hasShownTrainingComplete = localStorage.getItem('hasShownTrainingComplete');
-
-      if (hasShownTrainingComplete !== 'true' && status === 'trained' && !trainingError) {
-        setTimeout(() => {
-          setShowCelebration(true);
-          localStorage.setItem('hasShownTrainingComplete', 'true');
-        }, 1000);
-      }
+    // After hydration, restore training type from localStorage if available
+    const savedTrainingType = localStorage.getItem('trainingType');
+    if (savedTrainingType === 'local' || savedTrainingType === 'cloud') {
+      setTrainingType(savedTrainingType);
     }
-  }, [status, trainingError]);
+  }, []);
 
   // Check training status once when component loads
   useEffect(() => {
+    // Skip if not hydrated yet
+    if (!isHydrated) return;
+
     // Check if user has at least 3 memories
     const checkMemoryCount = async () => {
       try {
@@ -518,15 +472,18 @@ export default function TrainingPage(): JSX.Element {
         console.error('Error checking memory count:', error);
       }
 
+      // Initialize training type from localStorage first
+      const savedTrainingType = localStorage.getItem('trainingType');
+      if (savedTrainingType === 'local' || savedTrainingType === 'cloud') {
+        setTrainingType(savedTrainingType);
+      }
+
       // Check both local and cloud training status
-      await Promise.allSettled([
-        checkTrainStatus(),
-        checkCloudTrainingProgress()
-      ]);
+      await Promise.allSettled([checkLocalTrainingStatus(), checkCloudTrainingProgress()]);
     };
 
     checkMemoryCount();
-  }, []);
+  }, [isHydrated]);
 
   // Monitor training status changes and manage log connections
   useEffect(() => {
@@ -561,14 +518,17 @@ export default function TrainingPage(): JSX.Element {
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
-      stopPolling(); 
-      if (cloudPollingRef.current) { // Ensure cloud polling is stopped
+      stopPolling();
+      if (cloudPollingRef.current) {
+        // Ensure cloud polling is stopped
         clearTimeout(cloudPollingRef.current);
       }
-      if (pauseTimeoutRef.current) { // Clear pause timeout
+      if (pauseTimeoutRef.current) {
+        // Clear pause timeout
         clearTimeout(pauseTimeoutRef.current);
       }
-      if (pausePollingRef.current) { // Clear pause polling
+      if (pausePollingRef.current) {
+        // Clear pause polling
         clearTimeout(pausePollingRef.current);
       }
       pollingStopRef.current = true; // Set flag to stop any ongoing polling
@@ -672,41 +632,140 @@ export default function TrainingPage(): JSX.Element {
 
   // Handler function for stopping training
   const handleStopTraining = async () => {
+    // Prevent multiple pause requests
+    if (isPauseRequested) {
+      message.warning('Pause request already in progress, please wait...');
+      return false;
+    }
+
+    setIsPauseRequested(true);
     try {
+      setTrainActionLoading(true);
       const res = await stopTrain();
 
       if (res.data.code === 0) {
-        setIsTraining(false);
-        setTrainSuspended(true);
+        // Start polling for stop status
+        pollLocalPauseStatus();
+
+        // Set timeout for pause operation
+        pauseTimeoutRef.current = setTimeout(() => {
+          if (isPauseRequested) {
+            setIsPauseRequested(false);
+            setPauseStatus(null);
+            setTrainActionLoading(false);
+            message.error('Pause operation timed out. Please try again.');
+          }
+        }, pauseTimeoutDuration);
+
+        return true;
       } else {
         message.error(res.data.message || 'Failed to stop training');
+        setIsPauseRequested(false);
+        setTrainActionLoading(false);
+        return false;
       }
     } catch (error) {
       console.error('Error stopping training:', error);
       message.error('Failed to stop training');
+      setIsPauseRequested(false);
+      setTrainActionLoading(false);
+      return false;
     }
+  };
+
+  // Poll local training pause status until it's no longer pending
+  const pollLocalPauseStatus = () => {
+    if (pausePollingRef.current) {
+      clearTimeout(pausePollingRef.current);
+    }
+
+    pausePollingRef.current = setTimeout(async () => {
+      try {
+        const res = await checkStopStatus();
+
+        if (res.data.code === 0 && res.data.data) {
+          const status = res.data.data.status;
+          setPauseStatus(status);
+
+          if (status === 'pending') {
+            // Continue polling if still pending
+            pollLocalPauseStatus();
+          } else if (status === 'success') {
+            // Successfully stopped
+            setIsTraining(false);
+            setTrainSuspended(true);
+            setIsPauseRequested(false);
+            setPauseStatus(null);
+            stopPolling();
+            setTrainActionLoading(false);
+            message.success('Training paused successfully');
+
+            // Clear pause timeout if it exists
+            if (pauseTimeoutRef.current) {
+              clearTimeout(pauseTimeoutRef.current);
+              pauseTimeoutRef.current = null;
+            }
+          } else {
+            // 'failed'
+            message.error('Failed to pause training');
+            setIsPauseRequested(false);
+            setPauseStatus(null);
+            setTrainActionLoading(false);
+
+            // Clear pause timeout if it exists
+            if (pauseTimeoutRef.current) {
+              clearTimeout(pauseTimeoutRef.current);
+              pauseTimeoutRef.current = null;
+            }
+          }
+        } else {
+          // API error
+          setIsPauseRequested(false);
+          setPauseStatus(null);
+          setTrainActionLoading(false);
+          message.error(res.data.message || 'Failed to check pause status');
+
+          // Clear pause timeout if it exists
+          if (pauseTimeoutRef.current) {
+            clearTimeout(pauseTimeoutRef.current);
+            pauseTimeoutRef.current = null;
+          }
+        }
+      } catch (error) {
+        console.error('Error polling pause status:', error);
+        setIsPauseRequested(false);
+        setPauseStatus(null);
+        setTrainActionLoading(false);
+        message.error('Error checking pause status');
+
+        // Clear pause timeout if it exists
+        if (pauseTimeoutRef.current) {
+          clearTimeout(pauseTimeoutRef.current);
+          pauseTimeoutRef.current = null;
+        }
+      }
+    }, 3000); // Poll every 3 seconds
   };
 
   // Helper function to check if cloud training is in the critical stage
   const isInCriticalStage = (progressData: CloudProgressData | null): boolean => {
     if (!progressData) return false;
-    
+
     // Check if we're in the "Training to create Second Me" stage
     const currentStage = progressData.current_stage;
-    
+
     // Check by current_stage field
     if (currentStage === 'training_to_create_second_me') {
       return true;
     }
-    
+
     // Also check if any stage has the "Training to create Second Me" name and is in progress
     if (progressData.stages) {
-      return progressData.stages.some(stage => 
-        stage.name === 'Training to create Second Me' && 
-        stage.status === 'in_progress'
+      return progressData.stages.some(
+        (stage) => stage.name === 'Training to create Second Me' && stage.status === 'in_progress'
       );
     }
-    
+
     return false;
   };
 
@@ -726,10 +785,12 @@ export default function TrainingPage(): JSX.Element {
           content: (
             <div className="space-y-3">
               <p className="text-amber-600 font-medium">
-                ⚠️ You are currently in the &quot;Training to create Second Me&quot; stage of cloud training.
+                ⚠️ You are currently in the &quot;Training to create Second Me&quot; stage of cloud
+                training.
               </p>
               <p>
-                This critical stage does not support checkpoint resume functionality. If you stop cloud training now:
+                This critical stage does not support checkpoint resume functionality. If you stop
+                cloud training now:
               </p>
               <ul className="list-disc pl-6 space-y-1">
                 <li>All cloud training progress will be lost</li>
@@ -746,11 +807,11 @@ export default function TrainingPage(): JSX.Element {
             setIsPauseRequested(true);
             try {
               const res = await stopCloudTraining();
-              
+
               if (res.data.code === 0 && res.data.data) {
                 const status = res.data.data.status;
                 setPauseStatus(status);
-                
+
                 if (status === 'pending') {
                   // Start polling for status updates
                   pollPauseStatus();
@@ -765,7 +826,8 @@ export default function TrainingPage(): JSX.Element {
                   stopCloudPolling();
                   message.success('Cloud training stopped successfully');
                   resolve(true);
-                } else { // 'failed'
+                } else {
+                  // 'failed'
                   message.error('Failed to stop cloud training');
                   setIsPauseRequested(false);
                   setPauseStatus(null);
@@ -793,12 +855,13 @@ export default function TrainingPage(): JSX.Element {
     // Normal stopping for non-critical stages (supports checkpoint resume)
     setIsPauseRequested(true);
     try {
+      setCloudTrainActionLoading(true);
       const res = await stopCloudTraining();
-      
+
       if (res.data.code === 0 && res.data.data) {
         const status = res.data.data.status;
         setPauseStatus(status);
-        
+
         if (status === 'pending') {
           // Start polling for status updates
           pollPauseStatus();
@@ -810,44 +873,48 @@ export default function TrainingPage(): JSX.Element {
           setCloudTrainingStatus('suspended');
           setIsPauseRequested(false);
           setPauseStatus(null);
-          
+
           // Clear pause timeout if it exists
           if (pauseTimeoutRef.current) {
             clearTimeout(pauseTimeoutRef.current);
             pauseTimeoutRef.current = null;
           }
-          
+
           // Stop polling immediately since pause is confirmed
           stopCloudPolling();
           message.success('Cloud training stopped successfully');
-          
+
           return true;
-        } else { // 'failed'
+        } else {
+          // 'failed'
           message.error('Failed to stop cloud training');
           setIsPauseRequested(false);
           setPauseStatus(null);
+          setCloudTrainActionLoading(false);
           return false;
         }
       }
-      
+
       message.error(res.data.message || 'Failed to stop cloud training');
       setIsPauseRequested(false);
       setPauseStatus(null);
-      
+      setCloudTrainActionLoading(false);
+
       return false;
     } catch (error) {
       console.error('Error stopping cloud training:', error);
       message.error('Failed to stop cloud training');
       setIsPauseRequested(false);
       setPauseStatus(null);
-      
+      setCloudTrainActionLoading(false);
+
       return false;
     }
   };
 
   // Handle cloud training reset
   const handleResetCloudProgress = async () => {
-    setTrainActionLoading(true);
+    setCloudTrainActionLoading(true);
 
     try {
       const res = await resetCloudTrainingProgress();
@@ -858,7 +925,7 @@ export default function TrainingPage(): JSX.Element {
         setCloudTrainingStatus('idle');
         setStatus('training');
         resetTrainingState();
-        
+
         // Clear pause state
         setIsPauseRequested(false);
         setPauseStatus(null);
@@ -866,10 +933,10 @@ export default function TrainingPage(): JSX.Element {
           clearTimeout(pausePollingRef.current);
           pausePollingRef.current = null;
         }
-        
+
         localStorage.removeItem('trainingLogs');
         localStorage.removeItem('hasShownCloudTrainingComplete');
-        
+
         // Request progress after reset to get the initialized progress state
         try {
           const progressRes = await getCloudTrainingProgress();
@@ -884,7 +951,9 @@ export default function TrainingPage(): JSX.Element {
               console.log('Retrieved initial cloud training progress after reset:', progressData);
             }
           } else {
-            console.log('No initial progress found after reset, which is expected for a fresh start');
+            console.log(
+              'No initial progress found after reset, which is expected for a fresh start'
+            );
           }
         } catch (progressError) {
           console.error('Error getting initial progress after reset:', progressError);
@@ -897,16 +966,22 @@ export default function TrainingPage(): JSX.Element {
       console.error('Error resetting cloud training progress:', error);
       message.error('Failed to reset cloud training progress');
     } finally {
-      setTrainActionLoading(false);
+      setCloudTrainActionLoading(false);
     }
   };
 
   // Handle resume cloud training
   const handleResumeCloudTraining = async () => {
+    // 检查 Think Model 是否已配置
+    if (!thinkingConfigComplete) {
+      message.error('Please configure Thinking Model before resuming training');
+      return;
+    }
+    
     setIsTraining(true);
     setCloudTrainSuspended(false);
     setCloudTrainingStatus('training');
-    
+
     // Clear pause state
     setIsPauseRequested(false);
     setPauseStatus(null);
@@ -914,15 +989,23 @@ export default function TrainingPage(): JSX.Element {
       clearTimeout(pausePollingRef.current);
       pausePollingRef.current = null;
     }
-    
+
     try {
+      // 确保 is_cot 设置为 true
+      const cloudParams = {
+        ...cloudTrainingParams,
+        is_cot: true // 强制设置为 true
+      };
+      
       // Call the resume API endpoint
       const response = await resumeCloudTraining();
-      
+
       if (response.data.code === 0) {
         // Resume successful, restart polling
         setStatus('training');
-        startCloudTrainingPolling();
+        startCloudTrainingPolling(true); // Pass true to indicate this is a resume operation
+        message.success('Cloud training resumed successfully');
+        return true;
       } else {
         throw new Error(response.data.message || 'Failed to resume cloud training');
       }
@@ -930,8 +1013,46 @@ export default function TrainingPage(): JSX.Element {
       console.error('Error resuming cloud training:', error);
       setIsTraining(false);
       setCloudTrainSuspended(true);
-      setCloudTrainingStatus('suspended');
       message.error('Failed to resume cloud training');
+      return false;
+    }
+  };
+
+  // Resume local training
+  const handleResumeLocalTraining = async () => {
+    // 检查 Think Model 是否已配置
+    if (!thinkingConfigComplete) {
+      message.error('Please configure Thinking Model before resuming training');
+      return;
+    }
+    
+    setTrainActionLoading(true);
+    try {
+      // Use startTrain to resume from the current state
+      const res = await startTrain({
+        ...localTrainingParams,
+        is_cot: true, // 确保 is_cot 设置为 true
+        // Convert to legacy format for compatibility
+        local_model_name: localTrainingParams.model_name,
+        cloud_model_name: cloudTrainingParams.model_name
+      });
+
+      if (res.data.code === 0) {
+        setTrainSuspended(false);
+        setIsTraining(true);
+        startGetTrainingProgress(true); // 传入true表示这是恢复训练
+        message.success('Training resumed successfully');
+
+        // Save training type preference to localStorage
+        localStorage.setItem('trainingType', 'local');
+      } else {
+        message.error(res.data.message || 'Failed to resume training');
+      }
+    } catch (error: unknown) {
+      console.error('Error resuming training:', error);
+      message.error('Failed to resume training');
+    } finally {
+      setTrainActionLoading(false);
     }
   };
 
@@ -958,6 +1079,12 @@ export default function TrainingPage(): JSX.Element {
 
   // Start new training
   const handleStartNewTraining = async () => {
+    // 检查 Think Model 是否已配置
+    if (!thinkingConfigComplete) {
+      message.error('Please configure Thinking Model before starting training');
+      return;
+    }
+    
     setIsTraining(true);
     // Clear training logs
     setTrainingDetails([]);
@@ -969,6 +1096,7 @@ export default function TrainingPage(): JSX.Element {
       console.log('Using startTrain API to train new model:', localTrainingParams.model_name);
       const res = await startTrain({
         ...localTrainingParams,
+        is_cot: true, // 确保 is_cot 设置为 true
         // Convert to legacy format for compatibility
         local_model_name: localTrainingParams.model_name,
         cloud_model_name: cloudTrainingParams.model_name
@@ -995,7 +1123,55 @@ export default function TrainingPage(): JSX.Element {
     }
   };
 
-  // Retrain existing model
+  // Start local training
+  const handleStartLocalTraining = async () => {
+    // 检查 Think Model 是否已配置
+    if (!thinkingConfigComplete) {
+      message.error('Please configure Thinking Model before starting training');
+      return;
+    }
+    
+    setTrainActionLoading(true);
+    setIsTraining(true);
+    // Clear training logs
+    setTrainingDetails([]);
+    localStorage.removeItem('trainingLogs');
+    // Reset training status to initial state
+    resetTrainingState();
+
+    try {
+      console.log('Using startTrain API to train new model:', localTrainingParams.model_name);
+      const res = await startTrain({
+        ...localTrainingParams,
+        is_cot: true, // 确保 is_cot 设置为 true
+        // Convert to legacy format for compatibility
+        local_model_name: localTrainingParams.model_name,
+        cloud_model_name: cloudTrainingParams.model_name
+      } as TrainingConfig);
+
+      if (res.data.code === 0) {
+        // Save training configuration and start polling
+        localStorage.setItem('localTrainingParams', JSON.stringify(localTrainingParams));
+        scrollPageToBottom();
+        startGetTrainingProgress();
+      } else {
+        message.error(res.data.message || 'Failed to start training');
+        setIsTraining(false);
+      }
+    } catch (error: unknown) {
+      console.error('Error starting training:', error);
+      setIsTraining(false);
+
+      if (error instanceof Error) {
+        message.error(error.message || 'Failed to start training');
+      } else {
+        message.error('Failed to start training');
+      }
+    } finally {
+      setTrainActionLoading(false);
+    }
+  };
+
   const handleRetrainModel = async () => {
     setIsTraining(true);
     // Clear training logs
@@ -1033,122 +1209,57 @@ export default function TrainingPage(): JSX.Element {
     }
   };
 
-  const handleTrainingAction = async (type: 'local' | 'cloud' = 'local') => {
-    if (trainActionLoading) {
-      message.info('Please wait a moment...');
+  const handleRetrainCloudModel = async () => {
+    setCloudTrainActionLoading(true);
+    try {
+      // Reset cloud training progress first
+      const resetRes = await resetCloudTrainingProgress();
 
-      return;
-    }
-
-    if (!isTraining && serviceStarted) {
-      message.error('Model is already running, please stop it first');
-
-      return;
-    }
-
-    setTrainActionLoading(true);
-
-    setTrainingType(type);
-
-    // If training is in progress, stop it
-    if (isTraining) {
-      if (type === 'cloud') {
-        await handleStopCloudTraining();
-        // handleStopCloudTraining now handles state updates and polling stop immediately
-        setTrainActionLoading(false);
-        return;
+      if (resetRes.data.code === 0) {
+        // Then start a new training session
+        await handleStartCloudTraining();
       } else {
-        await handleStopTraining();
+        message.error(resetRes.data.message || 'Failed to reset cloud training progress');
+        setCloudTrainActionLoading(false);
       }
-
-      setTrainActionLoading(false);
-
-      return;
+    } catch (error) {
+      console.error('Error retraining cloud model:', error);
+      message.error('Failed to retrain cloud model');
+      setCloudTrainActionLoading(false);
     }
+  };
 
-    if (type === 'cloud') {
-      if (cloudTrainSuspended) {
+  const handleTrainingAction = async () => {
+    // Save training type preference to localStorage
+    localStorage.setItem('trainingType', trainingType);
+
+    if (trainingType === 'cloud') {
+      if (isTraining) {
+        // Pause cloud training
+        await handleStopCloudTraining();
+      } else if (cloudTrainSuspended) {
         // Resume cloud training
         await handleResumeCloudTraining();
-      } else if (cloudTrainingStatus === 'trained') {
+      } else if (cloudTrainingStatus === 'completed') {
         // Retrain cloud model
-        await handleStartCloudTraining();
-      } else if (cloudTrainingStatus === 'failed') {
-        // Retry or resume failed training
-        await handleStartCloudTraining();
+        await handleRetrainCloudModel();
       } else {
         // Start new cloud training
         await handleStartCloudTraining();
       }
     } else {
-      if (status === 'trained') {
+      if (isTraining) {
+        // Pause local training
+        await handleStopTraining();
+      } else if (trainSuspended) {
+        // Resume local training
+        await handleResumeLocalTraining();
+      } else if (status === 'trained') {
+        // Retrain local model
         await handleRetrainModel();
       } else {
-        await handleStartNewTraining();
-      }
-    }
-
-    setTrainActionLoading(false);
-  };
-
-  const handleStartCloudTraining = async () => {
-    setIsTraining(true);
-    setStatus('training');
-    setCloudTrainingStatus('training');
-    
-    setTrainingDetails([]);
-    localStorage.removeItem('trainingLogs');
-    localStorage.removeItem('hasShownCloudTrainingComplete'); // Reset celebration flag
-    
-    resetTrainingState();
-    setCloudProgress(null); // Reset cloud progress
-    setCloudJobId(null); // Reset cloud job ID
-    setCloudTrainSuspended(false); // Reset suspension state
-    
-    // Clear pause state
-    setIsPauseRequested(false);
-    setPauseStatus(null);
-    if (pausePollingRef.current) {
-      clearTimeout(pausePollingRef.current);
-      pausePollingRef.current = null;
-    }
-
-    try {
-      const res = await startCloudTraining({
-        base_model: cloudTrainingParams.base_model,
-        training_type: cloudTrainingParams.training_type || 'efficient_sft',
-        data_synthesis_mode: cloudTrainingParams.data_synthesis_mode || 'medium',
-        language: cloudTrainingParams.language || 'english',
-        hyper_parameters: {
-          n_epochs: cloudTrainingParams.hyper_parameters?.n_epochs,
-          learning_rate: cloudTrainingParams.hyper_parameters?.learning_rate
-        }
-      });
-
-      if (res.data.code === 0) {
-        const data = res.data.data as { job_id?: string };
-        const returnedJobId = data.job_id;
-        if (returnedJobId) {
-          setCloudJobId(returnedJobId);
-        }
-        
-        localStorage.setItem('cloudTrainingParams', JSON.stringify(cloudTrainingParams));
-        scrollPageToBottom();
-        setTrainingType('cloud');
-        startCloudTrainingPolling();
-      } else {
-        message.error(res.data.message || 'Failed to start cloud training');
-        setIsTraining(false);
-        setCloudTrainingStatus('idle');
-      }
-    } catch (error) {
-      console.error('Error starting cloud training:', error);
-      setIsTraining(false);
-
-      if (error instanceof Error) {
-        message.error(error.message || 'Failed to start cloud training');
-      } else {
-        message.error('Failed to start cloud training');
+        // Start new local training
+        await handleStartLocalTraining();
       }
     }
   };
@@ -1159,6 +1270,127 @@ export default function TrainingPage(): JSX.Element {
       stopCloudPolling();
     };
   }, []);
+
+  const pollProgress = () => {
+    if (pollingStopRef.current) return;
+
+    checkTrainStatus()
+      .then((res) => {
+        if (pollingStopRef.current) return;
+
+        if (res && res.data && res.data.data && res.data.data.progress) {
+          const progressData = res.data.data.progress;
+
+          // Handle different training statuses
+          if (progressData.status === 'completed') {
+            // Training completed successfully
+            setStatus('trained');
+            setIsTraining(false);
+            setTrainSuspended(false);
+
+            // Show celebration effect
+            const hasShownTrainingComplete = localStorage.getItem('hasShownTrainingComplete');
+            if (hasShownTrainingComplete !== 'true') {
+              setTimeout(() => {
+                setShowCelebration(true);
+                localStorage.setItem('hasShownTrainingComplete', 'true');
+              }, 1000);
+            }
+            stopPolling();
+          } else if (progressData.status === 'failed') {
+            // Training failed
+            setStatus('training');
+            setIsTraining(false);
+            setTrainSuspended(false);
+            stopPolling();
+            message.error('Training failed. Please check the logs for details.');
+          } else if (progressData.status === 'suspended') {
+            // Training suspended
+            setStatus('training');
+            setIsTraining(false);
+            setTrainSuspended(true);
+            setIsPauseRequested(false);
+            setPauseStatus(null);
+            stopPolling();
+            message.info('Training has been paused.');
+
+            // Clear pause timeout if it exists
+            if (pauseTimeoutRef.current) {
+              clearTimeout(pauseTimeoutRef.current);
+              pauseTimeoutRef.current = null;
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        console.error('Error polling training progress:', error);
+      })
+      .finally(() => {
+        if (!pollingStopRef.current) {
+          setTimeout(pollProgress, POLLING_INTERVAL);
+        }
+      });
+  };
+
+  const getTrainingButtonText = () => {
+    if (trainingType === 'cloud') {
+      if (isTraining) {
+        return 'Pause Cloud Training';
+      } else if (cloudTrainSuspended) {
+        return 'Resume Cloud Training';
+      } else if (cloudTrainingStatus === 'completed') {
+        return 'Retrain Cloud Model';
+      } else {
+        return 'Start Cloud Training';
+      }
+    } else {
+      if (isTraining) {
+        return 'Pause Training';
+      } else if (trainSuspended) {
+        return 'Resume Training';
+      } else if (status === 'trained') {
+        return 'Retrain Model';
+      } else {
+        return 'Start Training';
+      }
+    }
+  };
+
+  const getButtonLoadingState = () => {
+    if (trainingType === 'cloud') {
+      return cloudTrainActionLoading || isPauseRequested;
+    } else {
+      return trainActionLoading || isPauseRequested;
+    }
+  };
+
+  const getButtonDisabledState = () => {
+    if (trainingType === 'cloud') {
+      return cloudTrainActionLoading || isPauseRequested || pauseStatus === 'pending';
+    } else {
+      return trainActionLoading || isPauseRequested || pauseStatus === 'pending';
+    }
+  };
+
+  const getButtonType = () => {
+    if (trainingType === 'cloud') {
+      if (isTraining) {
+        return 'default';
+      } else if (cloudTrainSuspended) {
+        return 'primary';
+      } else {
+        return 'primary';
+      }
+    } else {
+      if (isTraining) {
+        return 'default';
+      } else if (trainSuspended) {
+        return 'primary';
+      } else {
+        return 'primary';
+      }
+    }
+  };
 
   const renderTrainingProgress = () => {
     return (
@@ -1184,10 +1416,329 @@ export default function TrainingPage(): JSX.Element {
     );
   };
 
+  // Check local training status including suspended state
+  const checkLocalTrainingStatus = async () => {
+    try {
+      const res = await checkTrainStatus();
+
+      if (res && res.data && res.data.data && res.data.data.progress) {
+        const progressData = res.data.data.progress;
+
+        // If local training is suspended, update the UI accordingly
+        if (progressData.status === 'suspended') {
+          setTrainingType('local');
+          setStatus('training');
+          setIsTraining(false);
+          setTrainSuspended(true);
+          console.log('Local training detected as suspended');
+        }
+        // If local training is in progress
+        else if (progressData.status === 'in_progress') {
+          setTrainingType('local');
+          setStatus('training');
+          setIsTraining(true);
+          setTrainSuspended(false);
+          console.log('Local training detected as in_progress');
+          startGetTrainingProgress();
+        }
+        // If local training is completed
+        else if (progressData.status === 'completed') {
+          setTrainingType('local');
+          setStatus('trained');
+          setIsTraining(false);
+          setTrainSuspended(false);
+          console.log('Local training detected as completed');
+        }
+        // If local training failed
+        else if (progressData.status === 'failed') {
+          setTrainingType('local');
+          setStatus('training');
+          setIsTraining(false);
+          setTrainSuspended(false);
+          console.log('Local training detected as failed');
+        }
+
+        // Save the training type to localStorage
+        localStorage.setItem('trainingType', 'local');
+      }
+    } catch (error) {
+      console.log('No active local training found or error checking status:', error);
+    }
+  };
+
+  // Check cloud training progress on page load
+  const checkCloudTrainingProgress = async () => {
+    try {
+      const res = await getCloudTrainingProgress();
+
+      if (res.data.code === 0) {
+        const progressData = res.data.data.progress;
+        const currentJobId = res.data.data.job_id;
+
+        // Only consider valid cloud training if we have proper progress data with a valid status
+        // AND we have actual data in the progress object (not just an empty object)
+        if (
+          progressData &&
+          typeof progressData === 'object' &&
+          Object.keys(progressData).length > 0 &&
+          currentJobId && // Ensure we have a job ID
+          (progressData.status === 'in_progress' ||
+            progressData.status === 'completed' ||
+            progressData.status === 'failed' ||
+            progressData.status === 'suspended')
+        ) {
+          setCloudProgress(progressData);
+
+          if (currentJobId) {
+            setCloudJobId(currentJobId);
+          }
+
+          // If training is in progress, check for pause status first
+          if (progressData.status === 'in_progress') {
+            setTrainingType('cloud');
+            console.log('Cloud training detected as in_progress, checking pause status...');
+
+            // Check if there's a pending or completed pause operation first
+            const pauseStatus = await checkCloudPauseStatus();
+            console.log('Pause status check result:', pauseStatus);
+
+            // If pause was successful or pending, don't start training flow
+            if (pauseStatus !== 'success' && pauseStatus !== 'pending') {
+              console.log('No active pause found, starting normal training flow...');
+              setIsTraining(true);
+              setStatus('training');
+              setCloudTrainSuspended(false);
+              setCloudTrainingStatus('training');
+              startCloudTrainingPolling();
+            } else {
+              console.log('Pause operation found, skipping training flow start');
+            }
+          } else if (progressData.status === 'completed') {
+            setTrainingType('cloud');
+            setStatus('trained');
+            setIsTraining(false);
+            setCloudTrainSuspended(false);
+            setCloudTrainingStatus('trained');
+          } else if (progressData.status === 'failed') {
+            setTrainingType('cloud');
+            setStatus('training'); // Keep as 'training' since ModelStatus doesn't have 'failed'
+            setIsTraining(false);
+            setCloudTrainSuspended(false);
+            setCloudTrainingStatus('failed');
+          } else if (progressData.status === 'suspended') {
+            setTrainingType('cloud');
+            setStatus('training');
+            setIsTraining(false);
+            setCloudTrainSuspended(true);
+            setCloudTrainingStatus('suspended');
+          }
+
+          // Save training type preference to localStorage only if we have a valid cloud training
+          localStorage.setItem('trainingType', 'cloud');
+          return true;
+        } else {
+          // If we don't have valid cloud training data, respect the user's saved preference
+          const savedTrainingType = localStorage.getItem('trainingType');
+          if (savedTrainingType === 'local' || savedTrainingType === 'cloud') {
+            setTrainingType(savedTrainingType);
+          }
+          return false;
+        }
+      }
+      return false;
+    } catch (error) {
+      // Silently handle errors for initial check - cloud training might not be active
+      console.log('No active cloud training found or error checking cloud progress:', error);
+      return false;
+    }
+  };
+
+  // Start polling training progress
+  const startPolling = () => {
+    if (pollingStopRef.current) {
+      return;
+    }
+
+    // Start new polling
+    checkTrainStatus()
+      .then(() => {
+        if (pollingStopRef.current) {
+          return;
+        }
+
+        setTimeout(() => {
+          startPolling();
+        }, POLLING_INTERVAL);
+      })
+      .catch((error) => {
+        console.error('Training status check failed:', error);
+        stopPolling(); // Stop polling when error occurs
+        setIsTraining(false);
+        message.error('Training status check failed, monitoring stopped');
+      });
+  };
+
+  // Start polling for training progress
+  const startGetTrainingProgress = (isResume = false) => {
+    // Reset polling stop flag
+    pollingStopRef.current = false;
+
+    // Set training status
+    setStatus('training');
+    setIsTraining(true);
+    setTrainSuspended(false);
+
+    // Reset pause-related states
+    setIsPauseRequested(false);
+    setPauseStatus(null);
+    if (pausePollingRef.current) {
+      clearTimeout(pausePollingRef.current);
+      pausePollingRef.current = null;
+    }
+    if (pauseTimeoutRef.current) {
+      clearTimeout(pauseTimeoutRef.current);
+      pauseTimeoutRef.current = null;
+    }
+    
+    // Only reset training state if not resuming
+    if (!isResume) {
+      resetTrainingState();
+    }
+
+    // Start polling
+    startPolling();
+  };
+
+  // Stop polling
+  const stopPolling = () => {
+    pollingStopRef.current = true;
+  };
+
+  useEffect(() => {
+    if (status === 'trained' || trainingError) {
+      stopPolling();
+      setIsTraining(false);
+
+      const hasShownTrainingComplete = localStorage.getItem('hasShownTrainingComplete');
+
+      if (hasShownTrainingComplete !== 'true' && status === 'trained' && !trainingError) {
+        setTimeout(() => {
+          setShowCelebration(true);
+          localStorage.setItem('hasShownTrainingComplete', 'true');
+        }, 1000);
+      }
+    }
+  }, [status, trainingError]);
+
   // Handle memory modal confirmation
   const handleMemoryModalConfirm = () => {
     setShowMemoryModal(false);
     router.push(ROUTER_PATH.TRAIN_MEMORIES);
+  };
+
+  const handleStartCloudTraining = async () => {
+    // 检查 Think Model 是否已配置
+    if (!thinkingConfigComplete) {
+      message.error('Please configure Thinking Model before starting training');
+      return;
+    }
+    
+    setCloudTrainActionLoading(true);
+    setIsTraining(true);
+    setStatus('training');
+    setCloudTrainingStatus('training');
+
+    setTrainingDetails([]);
+    localStorage.removeItem('trainingLogs');
+    localStorage.removeItem('hasShownCloudTrainingComplete'); // Reset celebration flag
+
+    resetTrainingState();
+    setCloudProgress(null); // Reset cloud progress
+    setCloudJobId(null); // Reset cloud job ID
+    setCloudTrainSuspended(false); // Reset suspension state
+
+    // Clear pause state
+    setIsPauseRequested(false);
+    setPauseStatus(null);
+    if (pausePollingRef.current) {
+      clearTimeout(pausePollingRef.current);
+      pausePollingRef.current = null;
+    }
+
+    try {
+      const res = await startCloudTraining({
+        base_model: cloudTrainingParams.base_model,
+        training_type: cloudTrainingParams.training_type || 'efficient_sft',
+        data_synthesis_mode: cloudTrainingParams.data_synthesis_mode || 'medium',
+        language: cloudTrainingParams.language || 'english',
+        is_cot: true, // 确保 is_cot 设置为 true
+        hyper_parameters: {
+          n_epochs: cloudTrainingParams.hyper_parameters?.n_epochs,
+          learning_rate: cloudTrainingParams.hyper_parameters?.learning_rate
+        }
+      });
+
+      if (res.data.code === 0) {
+        const data = res.data.data as { job_id?: string };
+        const returnedJobId = data.job_id;
+        if (returnedJobId) {
+          setCloudJobId(returnedJobId);
+        }
+
+        localStorage.setItem('cloudTrainingParams', JSON.stringify(cloudTrainingParams));
+        localStorage.setItem('trainingType', 'cloud'); // Save training type preference
+        scrollPageToBottom();
+        setTrainingType('cloud');
+        startCloudTrainingPolling();
+      } else {
+        message.error(res.data.message || 'Failed to start cloud training');
+        setIsTraining(false);
+        setCloudTrainingStatus('idle');
+      }
+    } catch (error) {
+      console.error('Error starting cloud training:', error);
+      setIsTraining(false);
+
+      if (error instanceof Error) {
+        message.error(error.message || 'Failed to start cloud training');
+      } else {
+        message.error('Failed to start cloud training');
+      }
+    } finally {
+      setCloudTrainActionLoading(false);
+    }
+  };
+
+  // Switch between local and cloud training
+  const handleSwitchTrainingType = (type: 'local' | 'cloud') => {
+    setTrainingType(type);
+    // Save training type preference to localStorage
+    localStorage.setItem('trainingType', type);
+
+    // Reset training states when switching
+    setIsTraining(false);
+    setTrainSuspended(false);
+    setCloudTrainSuspended(false);
+    setIsPauseRequested(false);
+    setPauseStatus(null);
+
+    // Clear any polling or timeouts
+    stopPolling();
+    if (pausePollingRef.current) {
+      clearTimeout(pausePollingRef.current);
+      pausePollingRef.current = null;
+    }
+    if (pauseTimeoutRef.current) {
+      clearTimeout(pauseTimeoutRef.current);
+      pauseTimeoutRef.current = null;
+    }
+
+    // Check if there's an active training for the selected type
+    if (type === 'local') {
+      checkLocalTrainingStatus();
+    } else {
+      checkCloudTrainingProgress();
+    }
   };
 
   return (
@@ -1215,10 +1766,14 @@ export default function TrainingPage(): JSX.Element {
         <TrainingConfiguration
           baseModelOptions={baseModelOptions}
           cudaAvailable={cudaAvailable}
-          handleResetProgress={trainingType === 'cloud' ? handleResetCloudProgress : handleResetProgress}
+          handleResetProgress={
+            trainingType === 'cloud' ? handleResetCloudProgress : handleResetProgress
+          }
           handleTrainingAction={handleTrainingAction}
           isTraining={isTraining}
           modelConfig={modelConfig}
+          thinkingModelConfig={thinkingModelConfig}
+          thinkingConfigComplete={thinkingConfigComplete}
           setSelectedInfo={setSelectedInfo}
           status={status}
           trainActionLoading={trainActionLoading}
@@ -1228,7 +1783,7 @@ export default function TrainingPage(): JSX.Element {
           updateLocalTrainingParams={updateLocalTrainingParams}
           updateCloudTrainingParams={updateCloudTrainingParams}
           trainingType={trainingType}
-          setTrainingType={setTrainingType}
+          setTrainingType={handleSwitchTrainingType}
           cloudTrainingStatus={cloudTrainingStatus}
           isPauseRequested={isPauseRequested}
           pauseStatus={pauseStatus}
@@ -1240,7 +1795,7 @@ export default function TrainingPage(): JSX.Element {
         {/* Always show training log regardless of training status */}
         {renderTrainingLog()}
 
-        {/* L1 and L2 Panels - show when training is complete or model is running */}
+        {/* stage2 and L2 Panels - show when training is complete or model is running */}
 
         <InfoModal
           content={
@@ -1248,7 +1803,7 @@ export default function TrainingPage(): JSX.Element {
               <p className="text-gray-600">{trainInfo.description}</p>
               <div>
                 <h4 className="font-medium mb-2">Key Features:</h4>
-                <ul className="list-disc pl-5 space-y-1.5">
+                <ul className="list-disc pl-5 space-y-1">
                   {trainInfo.features.map((feature, index) => (
                     <li key={index} className="text-gray-600">
                       {feature}

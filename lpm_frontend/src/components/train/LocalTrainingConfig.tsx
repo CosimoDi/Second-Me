@@ -11,7 +11,7 @@ import OpenAiModelIcon from '../svgs/OpenAiModelIcon';
 import CustomModelIcon from '../svgs/CustomModelIcon';
 import ColumnArrowIcon from '../svgs/ColumnArrowIcon';
 import DoneIcon from '../svgs/DoneIcon';
-// import ThinkingModelModal from '../ThinkingModelModal';
+import ThinkingModelModal from '../ThinkingModelModal';
 import { useModelConfigStore } from '@/store/useModelConfigStore';
 import classNames from 'classnames';
 
@@ -90,6 +90,13 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
     }
   }, [trainingParams, updateTrainingParams]);
 
+  useEffect(() => {
+    // 如果 is_cot 不是 true，则设置为 true
+    if (trainingParams.is_cot !== true) {
+      updateTrainingParams({ ...trainingParams, is_cot: true });
+    }
+  }, [trainingParams.is_cot, updateTrainingParams]);
+
   const disabledChangeParams = useMemo(() => {
     return isTraining || trainSuspended;
   }, [isTraining, trainSuspended]);
@@ -97,7 +104,6 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
   const thinkingConfigComplete = useMemo(() => {
     return (
       !!thinkingModelConfig.thinking_model_name &&
-      !!thinkingModelConfig.thinking_api_key &&
       !!thinkingModelConfig.thinking_endpoint
     );
   }, [thinkingModelConfig]);
@@ -511,31 +517,13 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
           </div>
         </div>
 
-        {/* <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <div className="text-base font-semibold text-gray-800 flex items-center">
-            Step 4: Configure Advanced Behavior
+            Step 4: Configure Thinking Model
           </div>
 
           <div className="flex mr-auto gap-2 items-center ">
-            <Checkbox
-              checked={trainingParams.is_cot}
-              disabled={disabledChangeParams}
-              onChange={(e) => {
-                e.stopPropagation();
-
-                if (!thinkingConfigComplete) {
-                  setShowThinkingWarning(true);
-
-                  if (!showThinkingWarning) {
-                    setTimeout(() => setShowThinkingWarning(false), 2000);
-                  }
-
-                  return;
-                }
-
-                updateTrainingParams({ ...trainingParams, is_cot: e.target.checked });
-              }}
-            />
+            {/* 移除复选框，但保留配置按钮 */}
             <div
               className={classNames(
                 `text-sm font-medium px-4 py-2 bg-white border rounded-md cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`,
@@ -550,16 +538,19 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
                 setOpenThinkingModel(true);
               }}
             >
-              Thinking Model
+              Configure Thinking Model
             </div>
-            <Tooltip title="Chain of Thought (CoT) enables the model to perform step-by-step reasoning during training. This improves the quality of responses by allowing the model to 'think' through complex questions before answering, resulting in more accurate and logically coherent outputs.">
-              <QuestionCircleOutlined className="cursor-pointer ml-2" />
+            <Tooltip
+              title="Configure how your Second Me thinks through complex questions. This is a required feature."
+              placement="top"
+            >
+              <QuestionCircleOutlined className="text-gray-400 cursor-help" />
             </Tooltip>
           </div>
-        </div> */}
+        </div>
       </div>
 
-      {/* <ThinkingModelModal onClose={() => setOpenThinkingModel(false)} open={openThinkingModel} /> */}
+      <ThinkingModelModal onClose={() => setOpenThinkingModel(false)} open={openThinkingModel} />
     </div>
   );
 };
