@@ -101,7 +101,6 @@ const ThinkingModelModal = (props: IProps) => {
             <Input
               autoComplete="off"
               className="w-full"
-              disabled
               onChange={(e) =>
                 setThinkingModelParams({
                   ...thinkingModelParams,
@@ -136,7 +135,6 @@ const ThinkingModelModal = (props: IProps) => {
           <Input
             autoComplete="off"
             className="w-full"
-            disabled
             onChange={(e) =>
               setThinkingModelParams({
                 ...thinkingModelParams,

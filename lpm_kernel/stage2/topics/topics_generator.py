@@ -204,7 +204,7 @@ class TopicGenerate():
         logging.info(f"processed_batch: {processed_batch}")
 
         # 获取prompt
-        if preferredLanguage == "简体中文/Simplified Chinese" or "zh":
+        if preferredLanguage == "简体中文/Simplified Chinese" or "chinese":
             message = Prompts.return_topics_generate_prompt(
                 system_prompt=self.langfuse_dict["topics_generate_zh"]["system_prompt"],
                 cur_topics=pre_topics,  # 使用预处理后的topics list

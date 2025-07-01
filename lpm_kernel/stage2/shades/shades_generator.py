@@ -168,7 +168,7 @@ class ShadeGenerate():
                 logger.info("Shades Cold Start!")
                 pbar.set_description("冷启动生成shade")
 
-                if preferredLanguage == "简体中文/Simplified Chinese" or "zh":
+                if preferredLanguage == "简体中文/Simplified Chinese" or "chinese":
                     # 获取prompt
                     message = Prompts.return_shades_generate_prompt(
                         system_prompt=self.langfuse_dict["shades_generate_zh"]["system_prompt"],
@@ -217,7 +217,7 @@ class ShadeGenerate():
                 logger.info("Shades Update!")
                 pbar.set_description("更新现有shade")
 
-                if preferredLanguage == "简体中文/Simplified Chinese" or "zh":
+                if preferredLanguage == "简体中文/Simplified Chinese" or "chinese":
                     # 获取prompt
                     message = Prompts.return_shades_update_prompt(
                         system_prompt=self.langfuse_dict["shades_update_zh"]["system_prompt"],
@@ -530,7 +530,7 @@ class ShadeContentGenerate():
             # 第一个batch使用generate，后续batch使用update
             if batch_idx == 1:
                 logger.info("First batch, using generate prompt")
-                if preferredLanguage == "简体中文/Simplified Chinese" or "zh":
+                if preferredLanguage == "简体中文/Simplified Chinese" or "chinese":
                     message = Prompts.return_shades_content_generate_prompt(
                         system_prompt=self.langfuse_dict["shades_content_generate_zh"]["system_prompt"],
                         topics_list=processed_topics,
@@ -550,7 +550,7 @@ class ShadeContentGenerate():
                     llm = self.llms["shades_content_generate"]
             else:
                 logger.info(f"Subsequent batch {batch_idx}, using update prompt")
-                if preferredLanguage == "简体中文/Simplified Chinese" or "zh":
+                if preferredLanguage == "简体中文/Simplified Chinese" or "chinese":
                     message = Prompts.return_shades_content_update_prompt(
                         system_prompt=self.langfuse_dict["shades_content_update_zh"]["system_prompt"],
                         cur_shade=cur_shades,
