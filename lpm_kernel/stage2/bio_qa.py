@@ -4,12 +4,12 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
+from lpm_kernel.configs.logging import get_train_process_logger
 from tqdm import tqdm
 
 from lpm_kernel.base.data import BaseData
 from lpm_kernel.base.database_operate import get_latest_global_bio
 from lpm_kernel.base.stage2_prompt import QUERY_GEN, ANSWER_GEN, QUERY_GEN4RAWBIO
-from lpm_kernel.configs.logging import get_train_process_logger
 
 load_dotenv(override=True)
 

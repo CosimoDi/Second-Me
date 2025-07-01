@@ -155,6 +155,13 @@ export const stopTrain = () => {
   });
 };
 
+export const checkStopStatus = () => {
+  return Request<CommonResponse<{ status: 'success' | 'pending' }>>({
+    method: 'get',
+    url: `/api/trainprocess/check_stop_status`
+  });
+};
+
 export const retrain = (config: TrainingConfig) => {
   return Request<CommonResponse<EmptyResponse>>({
     method: 'post',

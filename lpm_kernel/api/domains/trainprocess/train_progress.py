@@ -71,7 +71,7 @@ class TrainProgress:
                             "completed": False,
                             "status": "pending",
                             "have_output": True,
-                            "path": "resources/L2/data_pipeline/raw_data/topics.json"
+                            "path": "resources/data/stage2/topics/topic.json"
                         },
                         {
                             "name": "Generate Shades",

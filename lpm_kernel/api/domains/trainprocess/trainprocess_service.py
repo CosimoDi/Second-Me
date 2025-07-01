@@ -74,18 +74,6 @@ class TrainProcessService:
             self.is_stopped = False
             self.current_step = None
 
-            # Initialize L2 data dictionary
-            self.l2_data = {
-                "notes": None,
-                "basic_info": None,
-                "data_output_base_dir": None,
-                "topics_path": None,
-                "entitys_path": None,
-                "graph_path": None,
-                "config_path": None
-            }
-            self.l2_data_prepared = False
-
             params_manager = TrainingParamsManager()
             training_params = params_manager.get_latest_training_params()
             self.language = training_params["language"]
@@ -257,7 +245,7 @@ class TrainProcessService:
             logger.info("Generating topics...")
             topic_generate = TopicGenerate()
             topics = []
-            preferredLanguage = "zh"
+            preferredLanguage = self.language
             result = topic_generate.topics_generate(topics=topics, preferredLanguage=preferredLanguage)
 
             logger.info(f"Successfully generated {len(result)} topics")
@@ -320,7 +308,7 @@ class TrainProcessService:
                     "noteMemory": cur_note,
                     "topics": cur_topic,
                     "shades": [shade],
-                    "preferredLanguage": "简体中文/Simplified Chinese"
+                    "preferredLanguage": self.language
                 }
                 shades_content_result = shade_content_generate._call(shades_content_input)
                 logger.info(f"shade content generate result: {shades_content_result}")
@@ -363,7 +351,7 @@ class TrainProcessService:
                     "summary": "",
                     "shadesList": shades
                 },
-                "preferredLanguage": "简体中文/Simplified Chinese"
+                "preferredLanguage": self.language
             }
             result = global_bio_v2._call(inputs)
             with DatabaseSession.session() as session:
@@ -1220,8 +1208,6 @@ class TrainProcessService:
                 current_step = self.progress.progress.data["current_stage"]
                 current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_step),
                                      None)
-                current_stage = next((s for s in self.progress.progress.data["stages"] if s["name"] == current_step),
-                                     None)
                 if current_stage and current_stage["current_step"]:
                     step = ProcessStep(current_stage["current_step"].lower().replace(" ", "_"))
                     self.progress.mark_step_status(step, Status.FAILED)
@@ -1303,21 +1289,55 @@ class TrainProcessService:
             Optional[Dict]: Content of the output file for the specified step, or None if not found
         """
         try:
-            if step_name == "generate_biography":
-                logger.info("Querying stage2 version data for biography")
+            # 特殊处理从数据库获取的内容
+            if step_name == "generate_biography" or step_name == "generate_shades":
+                logger.info(f"Querying database for {step_name}")
                 return query_l1_version_data(1)
 
-            # If step_name is not provided or invalid, return None
-            if not step_name or step_name not in output_files:
+            # If step_name is not provided, return None
+            if not step_name:
+                logger.warning(f"Step name not provided")
                 return None
-
-            # Get file path for the requested step
-            file_path = output_files[step_name]
-            if not os.path.exists(file_path):
+                
+            # 检查是否在output_files字典中
+            if step_name in output_files:
+                file_path = output_files[step_name]
+                
+                # 特殊处理"From database"标记
+                if file_path == "From database":
+                    logger.info(f"Querying database for {step_name}")
+                    return query_l1_version_data(1)
+                
+                # 检查文件是否存在
+                if not os.path.exists(file_path):
+                    logger.warning(f"File path does not exist: {file_path}")
+                    return None
+                
+                # 读取并返回文件内容
+                logger.info(f"Reading file content from: {file_path}")
+                return read_file_content(file_path)
+            else:
+                # 如果不在字典中，尝试在进度数据中找到路径
+                for stage in self.progress.progress.data["stages"]:
+                    for step in stage["steps"]:
+                        step_key = step["name"].lower().replace(" ", "_")
+                        if step_name == step_key and step.get("path"):
+                            # 如果路径是"From database"，特殊处理
+                            if step["path"] == "From database":
+                                logger.info(f"Querying database for {step_name}")
+                                return query_l1_version_data(1)
+                                
+                            # 构建完整路径
+                            file_path = os.path.join(os.getcwd(), step["path"])
+                            if not os.path.exists(file_path):
+                                logger.warning(f"File path from progress data does not exist: {file_path}")
+                                return None
+                                
+                            logger.info(f"Reading file content from progress data path: {file_path}")
+                            return read_file_content(file_path)
+                
+                logger.warning(f"Step {step_name} not found in output_files or progress data")
                 return None
-
-            # Read and return file content
-            return read_file_content(file_path)
         except Exception as e:
             logger.error(f"Error getting step output content: {str(e)}")
             return None

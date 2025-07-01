@@ -1,23 +1,19 @@
-import time
-import json
-import os
 import enum
+import json
 import multiprocessing
-from multiprocessing import Process, Queue, Event
+import os
 import signal
-import psutil
-import sys
+import time
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
 
 from lpm_kernel.api.domains.cloud_service.cloud_process_step import CloudProcessStep
 from lpm_kernel.api.domains.cloud_service.cloud_progress_holder import CloudProgressHolder, CloudStatus
 from lpm_kernel.api.domains.cloud_service.service import CloudService
 from lpm_kernel.api.domains.trainprocess.process_step import ProcessStep
 from lpm_kernel.api.domains.trainprocess.trainprocess_service import TrainProcessService
+from lpm_kernel.common.repository.database_session import DatabaseSession
 from lpm_kernel.configs.logging import get_train_process_logger
 from lpm_kernel.models.memory import Memory
-from lpm_kernel.common.repository.database_session import DatabaseSession
 
 logger = get_train_process_logger()
 
@@ -112,7 +108,7 @@ class CloudTrainProcessService(TrainProcessService):
         """Prepare training data for cloud training"""
         try:
             logger.info("Starting training data preparation...")
-            
+
             logger.info("Executing memory matrix activation steps...")
             stage_name = "activating_the_memory_matrix"
             stage = self.progress.progress.stage_map.get(stage_name)
@@ -124,6 +120,7 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "list_documents"):
                     logger.info("Step 'list_documents' already completed, skipping...")
                 else:
+                    # stage["current_step"] = ProcessStep.LIST_DOCUMENTS
                     if not super().list_documents():
                         logger.error("Failed to list documents")
                         self.progress.mark_step_status(ProcessStep.LIST_DOCUMENTS, CloudStatus.FAILED)
@@ -146,6 +143,7 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "generate_document_embeddings"):
                     logger.info("Step 'generate_document_embeddings' already completed, skipping...")
                 else:
+                    # stage["current_step"] = ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS
                     if not super().generate_document_embeddings():
                         logger.error("Failed to generate document embeddings")
                         self.progress.mark_step_status(ProcessStep.GENERATE_DOCUMENT_EMBEDDINGS, CloudStatus.FAILED)
@@ -167,6 +165,7 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "process_chunks"):
                     logger.info("Step 'process_chunks' already completed, skipping...")
                 else:
+                    # stage["current_step"] = ProcessStep.CHUNK_DOCUMENT
                     if not super().process_chunks():
                         logger.error("Failed to process chunks")
                         self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, CloudStatus.FAILED)
@@ -264,6 +263,7 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "generate_biography"):
                     logger.info("Step 'generate_biography' already completed, skipping...")
                 else:
+                    # stage["current_step"] = ProcessStep.GENERATE_BIOGRAPHY
                     if not super().generate_biography():
                         logger.error("Failed to generate biography")
                         self.progress.mark_step_status(ProcessStep.GENERATE_BIOGRAPHY, CloudStatus.FAILED)
@@ -293,6 +293,7 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "generate_base"):
                     logger.info("Step 'generate_base' already completed, skipping...")
                 else:
+                    # stage["current_step"] = ProcessStep.GENERATE_BASE
                     if not super().generate_base():
                         logger.error("Failed to generate base data")
                         self.progress.mark_step_status(ProcessStep.GENERATE_BASE, CloudStatus.FAILED)
@@ -322,6 +323,7 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "bio_qa_generation"):
                     logger.info("Step 'bio_qa_generation' already completed, skipping...")
                 else:
+                    # stage["current_step"] = ProcessStep.BIO_QA_GENERATION
                     if not super().bio_qa_generation():
                         logger.error("Failed to generate bio QA")
                         self.progress.mark_step_status(ProcessStep.BIO_QA_GENERATION, CloudStatus.FAILED)
@@ -345,6 +347,7 @@ class CloudTrainProcessService(TrainProcessService):
                     logger.info("Step 'wiki_data_generation' already completed, skipping...")
                 else:
                     try:
+                        # stage["current_step"] = ProcessStep.WIKI_DATA_GENERATION
                         if not super().wiki_data_generation():
                             logger.error("Failed to generate wiki data")
                             self.progress.mark_step_status(ProcessStep.WIKI_DATA_GENERATION, CloudStatus.FAILED)
@@ -370,6 +373,7 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "generate_memqa_entity"):
                     logger.info("Step 'generate_memqa_entity' already completed, skipping...")
                 else:
+                    # stage["current_step"] = ProcessStep.GENERATE_MEMQA_ENTITY
                     if not super().generate_memqa_entity():
                         logger.error("Failed to generate MemQA entity")
                         self.progress.mark_step_status(ProcessStep.GENERATE_MEMQA_ENTITY, CloudStatus.FAILED)
@@ -484,9 +488,11 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "synthetic_no_notes_data_generation"):
                     logger.info("Step 'synthetic_no_notes_data_generation' already completed, skipping...")
                 else:
+                    # stage["current_step"] = ProcessStep.SYNTHETIC_NO_NOTES_DATA_GENERATION
                     if not super().synthetic_no_notes_data_generation():
                         logger.error("Failed to generate synthetic no notes data")
-                        self.progress.mark_step_status(ProcessStep.SYNTHETIC_NO_NOTES_DATA_GENERATION, CloudStatus.FAILED)
+                        self.progress.mark_step_status(ProcessStep.SYNTHETIC_NO_NOTES_DATA_GENERATION,
+                                                       CloudStatus.FAILED)
                         return PrepareDataResult.ERROR
 
                 if stage:
@@ -494,17 +500,20 @@ class CloudTrainProcessService(TrainProcessService):
                     if len(stage["steps"]) > 1:
                         stage["steps"][1]["completed"] = True
                         stage["steps"][1]["status"] = CloudStatus.COMPLETED
-                    logger.info(f"Updated {stage_name} progress to 66.6% after completing synthetic_no_notes_data_generation")
+                    logger.info(
+                        f"Updated {stage_name} progress to 66.6% after completing synthetic_no_notes_data_generation")
                     self._update_overall_progress()
 
                 if self.is_stopped:
-                    logger.info("Process has been stopped after completing synthetic_no_notes_data_generation, exiting.")
+                    logger.info(
+                        "Process has been stopped after completing synthetic_no_notes_data_generation, exiting.")
                     return PrepareDataResult.STOPPED
 
                 logger.info("Step 5.3: Converting data...")
                 if self.progress.is_step_completed(stage_name, "convert_data"):
                     logger.info("Step 'convert_data' already completed, skipping...")
                 else:
+                    # stage["current_step"] = ProcessStep.CONVERT_DATA
                     if not super().convert_data():
                         logger.error("Failed to convert data")
                         self.progress.mark_step_status(ProcessStep.CONVERT_DATA, CloudStatus.FAILED)
@@ -810,8 +819,11 @@ class CloudTrainProcessService(TrainProcessService):
                     if stage["name"] == current_stage:
                         current_step_name = stage.get("current_step")
                         if current_step_name:
+                            # 将current_step_name转换为小写并将空格替换为下划线
+                            normalized_step_name = current_step_name.lower().replace(" ", "_")
+                            logger.info(f"Normalized step name: {normalized_step_name}")
                             for step in ProcessStep:
-                                if step.value == current_step_name:
+                                if step.value == normalized_step_name:
                                     current_step = step
                                     logger.info(f"Found step in ProcessStep: {current_step}")
                                     is_data_synthesis_stage = True
@@ -835,14 +847,13 @@ class CloudTrainProcessService(TrainProcessService):
 
                 if current_stage_data:
                     step_name = current_step.value if hasattr(current_step, 'value') else str(current_step)
-                    logger.info(f"Looking for step with name: {step_name}")
                     for step in current_stage_data["steps"]:
-                        if step["name"] == step_name:
+                        normalized_step_name = step["name"].lower().replace(" ", "_")
+                        if normalized_step_name == step_name:
                             step_status = step["status"]
                             logger.info(f"Found step status: {step_status}")
                             break
 
-                    logger.info(f"Current step status: {step_status}")
                     if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED]:
                         logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
                     else:

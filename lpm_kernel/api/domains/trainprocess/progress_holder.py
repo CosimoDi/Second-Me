@@ -68,6 +68,7 @@ class TrainProgressHolder:
                 with open(self.progress_file, "r") as f:
                     saved_progress = json.load(f)
                     self.progress.data = saved_progress
+                    logger.debug(self.progress.data)
                     
                     self.progress.stage_map = {}
                     for stage in self.progress.data["stages"]:
@@ -122,8 +123,11 @@ class TrainProgressHolder:
     def _save_progress(self):
         """Save progress"""
         progress_dict = self.progress.to_dict()
-        with open(self.progress_file, "w") as f:
-            json.dump(progress_dict, f, indent=2)
+        try:
+            with open(self.progress_file, "w") as f:
+                json.dump(progress_dict, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save progress to {self.progress_file}: {str(e)}", exc_info=True)
 
     def is_step_completed(self, step: ProcessStep) -> bool:
         """Check if a step is completed"""
@@ -146,6 +150,7 @@ class TrainProgressHolder:
 
     def reset_progress(self):
         """Reset all progress"""
+        logger.info(f"Resetting progress for model: {self.progress_file}")
         self.progress = TrainProgress()
         self._save_progress()
 
