@@ -62,8 +62,8 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
 
   const trainButtonText = useMemo(() => {
     if (isTraining) {
-      // Show specific message when pausing is pending
-      if (activeTabKey === 'cloud' && isPauseRequested && pauseStatus === 'pending') {
+      // Show specific message when pausing is pending (for both local and cloud)
+      if ((activeTabKey === 'cloud' || activeTabKey === 'local') && isPauseRequested && pauseStatus === 'pending') {
         return 'Stopping...';
       }
 
