@@ -800,6 +800,14 @@ class CloudTrainProcessService(TrainProcessService):
         try:
             logger.info(f"Attempting to stop cloud training process for model: {self.model_name}")
 
+            if self.is_stopped:
+                logger.info("Training process is already stopped, returning success")
+                # 确保状态被设置为暂停
+                if hasattr(self, 'progress') and self.progress and hasattr(self.progress, 'progress') and self.progress.progress and hasattr(self.progress.progress, 'data'):
+                    self.progress.progress.data["status"] = CloudStatus.SUSPENDED
+                    self.progress.save_progress()
+                return 'success'
+                
             self.is_stopped = True
 
             current_stage = self.progress.get_progress().get("current_stage")
@@ -851,6 +859,8 @@ class CloudTrainProcessService(TrainProcessService):
 
                     if step_status in [CloudStatus.COMPLETED, CloudStatus.FAILED]:
                         logger.info(f"Step {current_step.value} has status {step_status}, continuing with stop process")
+                        self.progress.progress.data["status"] = CloudStatus.SUSPENDED
+                        self.progress.save_progress()
                     else:
                         logger.info(f"Step {current_step.value} is still running, returning pending status")
                         return "pending"
@@ -904,6 +914,9 @@ class CloudTrainProcessService(TrainProcessService):
                 # Save the progress
                 self.progress.save_progress()
                 logger.info("Cloud process steps have been set to pending status")
+
+            self.progress.progress.data["status"] = CloudStatus.SUSPENDED
+            self.progress.save_progress()
 
             logger.info("Cloud training process has been stopped successfully")
             return 'success'

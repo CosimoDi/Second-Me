@@ -243,6 +243,13 @@ export default function TrainingPage(): JSX.Element {
           return true;
         }
       }
+      
+      // 如果没有有效的进度数据但API调用成功，继续轮询
+      // 这确保了即使后端尚未准备好进度数据，前端也会继续检查
+      if (!pollingStopRef.current) {
+        console.log('No valid progress data yet, continuing polling');
+        cloudPollingRef.current = setTimeout(pollCloudProgress, POLLING_INTERVAL);
+      }
     } catch (error) {
       console.error('Error polling cloud training progress:', error);
 

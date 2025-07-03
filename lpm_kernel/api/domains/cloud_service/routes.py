@@ -20,7 +20,7 @@ from pathlib import Path
 from ....configs.config import Config
 from .service import CloudService
 from .cloud_trainprocess_service import CloudTrainProcessService
-from .cloud_progress_holder import CloudProgressHolder
+from .cloud_progress_holder import CloudProgressHolder, CloudStatus
 from ...services.user_llm_config_service import UserLLMConfigService
 from ...dto.user_llm_config_dto import UpdateUserLLMConfigDTO
 from lpm_kernel.api.domains.cloud_service.dto.cloud_inference_dto import CloudInferenceRequest
@@ -172,6 +172,11 @@ def resume_cloud_training():
         if cloud_train_service is None:
             logger.warning("No training parameters found in file")
             return jsonify(APIResponse.error("No training parameters found. Please use /train/start endpoint for initial training."))
+
+        if cloud_train_service.progress and cloud_train_service.progress.progress and cloud_train_service.progress.progress.data:
+            cloud_train_service.progress.progress.data["status"] = CloudStatus.IN_PROGRESS
+            cloud_train_service.progress.save_progress()
+            logger.info("Reset cloud training status from suspended to in_progress")
 
         thread = threading.Thread(target=cloud_train_service.start_process)
         thread.daemon = True
