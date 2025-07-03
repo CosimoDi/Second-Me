@@ -607,6 +607,8 @@ class CloudProgressHolder:
                 for word in words:
                     if word.lower() == "qa":
                         capitalized_words.append("QA")
+                    elif word.lower() == "memqa":
+                        capitalized_words.append("MemQA")
                     else:
                         capitalized_words.append(word.capitalize())
                 display_step_name = " ".join(capitalized_words)

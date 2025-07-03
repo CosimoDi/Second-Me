@@ -92,6 +92,10 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
       return 'Retrain Locally';
     }
 
+    if (status === 'failed') {
+      return 'Retry Local Training';
+    }
+
     if (trainSuspended) {
       return 'Resume Training';
     }
