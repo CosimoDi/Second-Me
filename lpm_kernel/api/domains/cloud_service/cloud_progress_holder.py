@@ -602,7 +602,14 @@ class CloudProgressHolder:
                 return False
 
             if isinstance(step_name, str) and "_" in step_name:
-                display_step_name = " ".join(word.capitalize() for word in step_name.split("_"))
+                words = step_name.split("_")
+                capitalized_words = []
+                for word in words:
+                    if word.lower() == "qa":
+                        capitalized_words.append("QA")
+                    else:
+                        capitalized_words.append(word.capitalize())
+                display_step_name = " ".join(capitalized_words)
             else:
                 display_step_name = step_name
 

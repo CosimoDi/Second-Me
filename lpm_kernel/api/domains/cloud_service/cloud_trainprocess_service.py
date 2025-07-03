@@ -120,7 +120,6 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "list_documents"):
                     logger.info("Step 'list_documents' already completed, skipping...")
                 else:
-                    # stage["current_step"] = ProcessStep.LIST_DOCUMENTS
                     if not super().list_documents():
                         logger.error("Failed to list documents")
                         self.progress.mark_step_status(ProcessStep.LIST_DOCUMENTS, CloudStatus.FAILED)
@@ -165,7 +164,6 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "process_chunks"):
                     logger.info("Step 'process_chunks' already completed, skipping...")
                 else:
-                    # stage["current_step"] = ProcessStep.CHUNK_DOCUMENT
                     if not super().process_chunks():
                         logger.error("Failed to process chunks")
                         self.progress.mark_step_status(ProcessStep.CHUNK_DOCUMENT, CloudStatus.FAILED)
@@ -194,7 +192,7 @@ class CloudTrainProcessService(TrainProcessService):
 
                 # Update progress to 100% after completing first stage
                 if stage:
-                    stage["progress"] = 100.0  # All completed, progress 100%
+                    stage["progress"] = 100.0
                     stage["status"] = CloudStatus.COMPLETED
                     # Update last step status
                     if len(stage["steps"]) > 3:
@@ -263,7 +261,6 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "generate_biography"):
                     logger.info("Step 'generate_biography' already completed, skipping...")
                 else:
-                    # stage["current_step"] = ProcessStep.GENERATE_BIOGRAPHY
                     if not super().generate_biography():
                         logger.error("Failed to generate biography")
                         self.progress.mark_step_status(ProcessStep.GENERATE_BIOGRAPHY, CloudStatus.FAILED)
@@ -488,7 +485,6 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "synthetic_no_notes_data_generation"):
                     logger.info("Step 'synthetic_no_notes_data_generation' already completed, skipping...")
                 else:
-                    # stage["current_step"] = ProcessStep.SYNTHETIC_NO_NOTES_DATA_GENERATION
                     if not super().synthetic_no_notes_data_generation():
                         logger.error("Failed to generate synthetic no notes data")
                         self.progress.mark_step_status(ProcessStep.SYNTHETIC_NO_NOTES_DATA_GENERATION,
@@ -513,7 +509,6 @@ class CloudTrainProcessService(TrainProcessService):
                 if self.progress.is_step_completed(stage_name, "convert_data"):
                     logger.info("Step 'convert_data' already completed, skipping...")
                 else:
-                    # stage["current_step"] = ProcessStep.CONVERT_DATA
                     if not super().convert_data():
                         logger.error("Failed to convert data")
                         self.progress.mark_step_status(ProcessStep.CONVERT_DATA, CloudStatus.FAILED)

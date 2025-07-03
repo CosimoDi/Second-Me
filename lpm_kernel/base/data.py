@@ -69,10 +69,9 @@ class BaseData(ABC):
                         extra_body={"metadata": {"tags": ["lpm-pipeline-using"]}},
                     ).choices[0].message.content
                     return responses
-
             except Exception as e:
                 logger.error(f"Raise ERROR: {e} WHEN GENERATE RESPONSE")
-                return None
+                raise
 
         with ThreadPoolExecutor(max_workers=max(min(self.max_workers, len(messages_list)), 1)) as executor:
             futures = [executor.submit(process_request, messages) for messages in messages_list]
