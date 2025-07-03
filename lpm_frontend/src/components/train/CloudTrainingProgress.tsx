@@ -189,7 +189,7 @@ const CloudTrainingProgress = (props: CloudTrainingProgressProps): JSX.Element |
 
   const overallProgress = cloudProgressData.overall_progress || 0;
   const currentStageKey = cloudProgressData.current_stage;
-
+  
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div className="flex items-center justify-between mb-4">

@@ -27,16 +27,15 @@ from lpm_kernel.configs.config import Config
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
 from lpm_kernel.file_data.chunker import DocumentChunker
 from lpm_kernel.file_data.document_repository import DocumentRepository
+from lpm_kernel.file_data.document_service import document_service
 from lpm_kernel.kernel.chunk_service import ChunkService
-from lpm_kernel.kernel.l1.l1_manager import (
-    document_service,
-)
 from lpm_kernel.models.l1 import L1Version
 from lpm_kernel.models.memory import Memory
 from lpm_kernel.stage1.data import Stage1Data
 from lpm_kernel.stage2.bio_qa import BioQAData
 from lpm_kernel.stage2.global_bio.base import GlobalBioV2
 from lpm_kernel.stage2.memqa.description import DescriptionData
+from lpm_kernel.file_data.document_service import document_service
 from lpm_kernel.stage2.memqa.diversity import DiversityData
 from lpm_kernel.stage2.memqa.entity import EntityData
 from lpm_kernel.stage2.memqa.relation import RelationshipData
@@ -249,7 +248,8 @@ class TrainProcessService:
             result = topic_generate.topics_generate(topics=topics, preferredLanguage=preferredLanguage)
 
             logger.info(f"Successfully generated {len(result)} topics")
-
+            analyzed_docs = document_service.analyze_all_documents()
+            logger.info(f"Successfully analyzed {len(analyzed_docs)} documents")
             # Mark step as completed
             self.progress.mark_step_status(ProcessStep.EXTRACT_DIMENSIONAL_TOPICS, Status.COMPLETED)
             logger.info("Dimensional topics extraction (L0) completed successfully")

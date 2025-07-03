@@ -62,8 +62,8 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
 
   const trainButtonText = useMemo(() => {
     if (isTraining) {
-      // Show specific message when pausing is pending
-      if (activeTabKey === 'cloud' && isPauseRequested && pauseStatus === 'pending') {
+      // Show specific message when pausing is pending (for both local and cloud)
+      if ((activeTabKey === 'cloud' || activeTabKey === 'local') && isPauseRequested && pauseStatus === 'pending') {
         return 'Stopping...';
       }
 
@@ -83,6 +83,11 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
       if (cloudTrainingStatus === 'failed') {
         return 'Retry Cloud Training';
       }
+      
+      // 添加对pending状态的处理
+      if (cloudTrainingStatus === 'pending' || (isPauseRequested && pauseStatus === 'pending')) {
+        return 'Stopping...';
+      }
 
       return 'Start Cloud Training';
     }
@@ -90,6 +95,10 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
     // Local training button logic
     if (status === 'trained') {
       return 'Retrain Locally';
+    }
+
+    if (status === 'failed') {
+      return 'Retry Local Training';
     }
 
     if (trainSuspended) {
@@ -108,17 +117,23 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
   ]);
 
   const trainButtonIcon = useMemo(() => {
+    // 显示加载图标的条件：
+    // 1. 训练操作正在加载中
+    // 2. 本地训练暂停请求中 (isPauseRequested && pauseStatus === 'pending')
+    // 3. 云端训练状态为pending
+    if (trainActionLoading || 
+        (isPauseRequested && pauseStatus === 'pending') || 
+        cloudTrainingStatus === 'pending') {
+      return <Spin className="h-5 w-5 mr-2" />;
+    }
+    
+    // 训练中显示停止图标，否则显示开始图标
     return isTraining ? (
-      trainActionLoading ||
-      (activeTabKey === 'cloud' && isPauseRequested && pauseStatus === 'pending') ? (
-        <Spin className="h-5 w-5 mr-2" />
-      ) : (
-        <StopIcon className="h-5 w-5 mr-2" />
-      )
+      <StopIcon className="h-5 w-5 mr-2" />
     ) : (
       <PlayIcon className="h-5 w-5 mr-2" />
     );
-  }, [isTraining, trainActionLoading, activeTabKey, isPauseRequested, pauseStatus]);
+  }, [isTraining, trainActionLoading, cloudTrainingStatus, isPauseRequested, pauseStatus]);
 
   const handleTraining = async () => {
     if (!isTraining && !trainSuspended) {
@@ -352,7 +367,11 @@ const TrainingConfiguration: React.FC<TrainingConfigurationProps> = ({
           </button>
         )}
         <button
-          className={`inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isTraining ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}
+          className={`inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+            isTraining || cloudTrainingStatus === 'pending' || (isPauseRequested && pauseStatus === 'pending') 
+              ? 'bg-red-600 hover:bg-red-700' 
+              : 'bg-blue-600 hover:bg-blue-700'
+          }
           ${!isTraining && !modelConfig?.provider_type ? 'bg-gray-300 hover:bg-gray-400 cursor-not-allowed' : 'cursor-pointer'}
           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
           disabled={!isTraining && !modelConfig?.provider_type}

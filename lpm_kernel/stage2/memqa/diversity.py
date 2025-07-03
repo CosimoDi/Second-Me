@@ -92,7 +92,7 @@ class DiversityData(BaseData):
         status_bio = []
         return global_bio, status_bio
 
-    def preprocess(self, config_path: str = "resources/data/stage2/config_diversity.json",
+    def preprocess(self, config_path: str = "lpm_kernel/base/config_diversity.json",
                    wiki: str = "resources/data/stage2/wiki/wiki_res.json",
                    entities_path: str = "resources/data/stage2/wiki/mapping_output.json",
                    note_path: str = "resources/data/stage2/remade_note.json"):
