@@ -863,6 +863,8 @@ class CloudTrainProcessService(TrainProcessService):
                         self.progress.save_progress()
                     else:
                         logger.info(f"Step {current_step.value} is still running, returning pending status")
+                        self.progress.progress.data["status"] = CloudStatus.PENDING
+                        self.progress.save_progress()
                         return "pending"
 
             if not self.job_id:
