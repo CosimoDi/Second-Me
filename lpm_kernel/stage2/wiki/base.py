@@ -144,7 +144,6 @@ class EntityScorer:
         answer = self.llm.chat.completions.create(
             model=MODEL_NAME,
             messages=message,
-            extra_body={"metadata": {"tags": "lpm_entity_scorer"}},
         )
         # 获取对话生成的内容
         content = answer.choices[0].message.content
@@ -230,11 +229,6 @@ class EntityExtractor:
         "presence_penalty": 0,
         # "request_timeout": 60,
         # "max_retries": 1
-        "extra_body": {
-            "metadata": {
-                "tags": ["lpm_entity_extractor"]
-            }
-        }
     }
 
     def __init__(self, **kwargs):
@@ -956,11 +950,6 @@ class PersonalWiki:
         # "presence_penalty": 0,
         # "request_timeout": 45,
         # "max_retries": 1,
-        "extra_body": {
-            "metadata": {
-                "tags": ["lpm_personal_wiki"]
-            }
-        }
     }
 
     def __init__(self, **kwargs):
