@@ -100,7 +100,6 @@ class NoNoteDataGenerator:
             model=self.model_name,
             messages=[{"role": "system", "content": prompt}],
             response_format={"type": "json_object"},
-            extra_body={"metadata": {"tags": ["lpm-pipeline-using"]}},
             max_tokens=1000,
             temperature=0.7
         )

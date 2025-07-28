@@ -233,7 +233,6 @@ class SyntheticDataGenerator:
                     {"role": "system", "content": prompt},
                 ],
                 response_format={"type": "json_object"},
-                extra_body={"metadata": {"tags": ["lpm-pipeline-using"]}},
                 max_tokens=max_tokens,
                 temperature=temperature
             )
@@ -269,7 +268,6 @@ class SyntheticDataGenerator:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                extra_body={"metadata": {"tags": ["lpm-pipeline-using"]}},
                 max_tokens=max_tokens,
                 temperature=temperature
             )

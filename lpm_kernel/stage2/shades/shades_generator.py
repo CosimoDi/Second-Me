@@ -192,7 +192,6 @@ class ShadeGenerate():
                     answer = llm.chat.completions.create(
                         model=self.model_name,
                         messages=message,
-                        extra_body={"metadata": {"tags": ["lpm_shades_generate"]}},
                     )
                     result = answer.choices[0].message.content
                     if result is None:
@@ -243,7 +242,6 @@ class ShadeGenerate():
                     answer = llm.chat.completions.create(
                         model=self.model_name,
                         messages=message,
-                        extra_body={"metadata": {"tags": ["lpm_shades_update"]}},
                     )
                     result = answer.choices[0].message.content
 
@@ -479,7 +477,6 @@ class ShadeContentGenerate():
             answer = llm.chat.completions.create(
                 model=self.model_name,
                 messages=message,
-                extra_body={"metadata": {"tags": ["lpm_shades_content_generate"]}},
             )
             result = answer.choices[0].message.content
 
