@@ -115,7 +115,6 @@ class EntityScorer:
         answer = self.llm.chat.completions.create(
             model=MODEL_NAME,
             messages=message,
-            extra_body={"metadata": {"tags": ["lpm_entity_scorer"]}},
         )
         # 获取对话生成的内容
         content = answer.choices[0].message.content
@@ -145,7 +144,7 @@ class EntityScorer:
         answer = self.llm.chat.completions.create(
             model=MODEL_NAME,
             messages=message,
-            extra_body={"metadata": {"tags": ["lpm_entity_scorer"]}},
+            extra_body={"metadata": {"tags": "lpm_entity_scorer"}},
         )
         # 获取对话生成的内容
         content = answer.choices[0].message.content
