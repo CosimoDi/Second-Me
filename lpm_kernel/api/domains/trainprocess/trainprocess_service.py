@@ -77,6 +77,8 @@ class TrainProcessService:
             training_params = params_manager.get_latest_training_params()
             self.language = training_params["language"]
 
+            # Data filtering parameters will be retrieved from TrainingParamsManager when needed
+
         # Update model name and progress instance if model name changes
         if current_model_name != self.model_name:
             self.model_name = current_model_name
@@ -643,6 +645,82 @@ class TrainProcessService:
 
         except Exception as e:
             logger.error(f"Data conversion failed: {str(e)}")
+
+    def data_filtering(self) -> bool:
+        """Filter and assess quality of training data using Ollama Gemma"""
+        try:
+            # Mark step as in progress
+            self.progress.mark_step_status(ProcessStep.DATA_FILTERING, Status.IN_PROGRESS)
+            logger.info("Starting data filtering with Ollama Gemma...")
+
+            # Import the MergedDataJudge
+            from lpm_kernel.L2.merged_data_judge import MergedDataJudge
+            
+            # Get user biography for context
+            from lpm_kernel.base.database_operate import get_latest_global_bio
+            user_bio = get_latest_global_bio().content_third_view if get_latest_global_bio() else ""
+            
+            # Get filtering parameters from TrainingParamsManager
+            training_params = TrainingParamsManager.get_latest_training_params()
+            filtering_model = training_params.get('data_filtering_model', 'gemma:2b')
+            max_workers = training_params.get('data_filtering_workers', 5)
+            keep_ratio = training_params.get('data_filtering_keep_ratio', 0.8)
+            
+            # Log filtering parameters
+            logger.info(f"Data filtering parameters:")
+            logger.info(f"  - User bio length: {len(user_bio)} characters")
+            logger.info(f"  - User bio preview: {user_bio[:200]}{'...' if len(user_bio) > 200 else ''}")
+            logger.info(f"  - Filtering model: {filtering_model}")
+            logger.info(f"  - Keep ratio: {keep_ratio * 100:.0f}% ({keep_ratio})")
+            logger.info(f"  - Max workers: {max_workers}")
+            
+            # Initialize the judge with selected model
+            judge = MergedDataJudge(
+                model_name=filtering_model,
+                ollama_host="http://localhost:11434",
+                user_bio=user_bio
+            )
+            
+            # Define input and output paths
+            merged_json_path = "resources/data/merged.json"
+            # filtered_output_path = "resources/data/filtered_merged.json"
+            
+            # Check if merged.json exists
+            if not os.path.exists(merged_json_path):
+                logger.error(f"Merged data file not found: {merged_json_path}")
+                self.progress.mark_step_status(ProcessStep.DATA_FILTERING, Status.FAILED)
+                return False
+            
+            # Perform data filtering
+            logger.info("Starting data quality assessment and filtering...")
+            judge.filter_and_score_data_concurrent(
+                merged_json_path=merged_json_path,
+                output_path=merged_json_path,
+                user_bio=user_bio,
+                keep_ratio=keep_ratio,
+                max_workers=max_workers
+            )
+            
+            # Replace the original merged.json with filtered data
+            # import shutil
+            # shutil.move(filtered_output_path, merged_json_path)
+            logger.info(f"Data filtering completed. Filtered data saved to {merged_json_path}")
+            
+            # Release Ollama models from memory to free up VRAM for training
+            logger.info("Releasing Ollama models from memory...")
+            try:
+                judge.cleanup()
+                logger.info("✅ Successfully released Ollama models from memory")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not release Ollama models: {str(e)}")
+            
+            self.progress.mark_step_status(ProcessStep.DATA_FILTERING, Status.COMPLETED)
+            return True
+
+        except Exception as e:
+            logger.error(f"Data filtering failed: {str(e)}")
+            self.progress.mark_step_status(ProcessStep.DATA_FILTERING, Status.FAILED)
+            return False
 
     def train(self) -> bool:
         """Start model training"""

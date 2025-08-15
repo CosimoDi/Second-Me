@@ -235,6 +235,7 @@ class SyntheticDataGenerator:
                 response_format={"type": "json_object"},
                 max_tokens=max_tokens,
                 temperature=temperature
+                # extra_body={"metadata": {"tags": "lpm-pipeline-using"}},
             )
 
             generated_text = response.choices[0].message.content
@@ -270,6 +271,7 @@ class SyntheticDataGenerator:
                 ],
                 max_tokens=max_tokens,
                 temperature=temperature
+                # extra_body={"metadata": {"tags": "lpm-pipeline-using"}},
             )
 
             result = response.choices[0].message

@@ -102,6 +102,7 @@ class NoNoteDataGenerator:
             response_format={"type": "json_object"},
             max_tokens=1000,
             temperature=0.7
+            # extra_body={"metadata": {"tags": "lpm-pipeline-using"}},
         )
         generated_text = response.choices[0].message.content
         questions = self.extract_questions_from_response(generated_text)
