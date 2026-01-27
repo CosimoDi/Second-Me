@@ -677,12 +677,31 @@ class TopicsGenerator:
         Returns:
             A tuple containing the values for the two keys
         """
-        spl = key1 + '":'
-        b = '{"' + spl + "".join(content.split(spl)[1:])
-        c = b.split("}")[0] + "}"
+        logger.info(f"原始 content：{content}")
+        logger.info(f"key1：{key1}，key2：{key2}")
+    
+        # 核心修改：三元表达式判断 key1 是否为空，为空则默认用 "topic"
+        effective_key1 = key1 if (key1 and key1.strip()) else "topic"
+        spl = effective_key1 + '":'  # 用处理后的有效 key1 构建分隔符
+    
+        logger.info(f"spl 分割符：{spl}")
+        split_content = content.split(spl)
+        logger.info(f"content 分割后：{split_content}")
+    
+    # 原有容错逻辑保留
+        if len(split_content) < 2:
+            logger.warning(f"未找到分割符 {spl}，直接解析原始 content")
+            c = content
+        else:
+            b = '{"' + spl + "".join(content.split(spl)[1:])
+            logger.info(f"拼接后 b：{b}")
+            c = b.split("}")[0] + "}"
+    
+        logger.info(f"最终待解析 c：{c}")
         res_dict = json.loads(c)
-
-        return res_dict[key1], res_dict[key2]
+        logger.info(f"解析后 res_dict：{res_dict}")
+        logger.info(f"提取结果：{res_dict[effective_key1]}，{res_dict[key2]}")
+        return res_dict[effective_key1], res_dict[key2]
 
 
     def __build_embedding_chunks(self, notes_list: List[Note]) -> tuple:
