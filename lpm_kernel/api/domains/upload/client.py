@@ -464,6 +464,7 @@ class RegistryClient:
         """
         response = requests.get(
             f"{self.server_url}/api/upload/count",
+            verify=False,  # NOTE: app.secondme.io SSL 证书过期时用于绕过验证（本地登录报错修复）
         )
         return ResponseHandler.handle_response(
             response,
