@@ -8,6 +8,9 @@ DATA_SYNTHESIS_MODE="low"
 HALF=False
 USE_CUDA=False  # Default to False, will be overridden by parameter
 IS_COT=False
+MAX_SEQ_LENGTH="2048"
+PER_DEVICE_TRAIN_BATCH_SIZE="2"
+GRADIENT_ACCUMULATION_STEPS="$CONCURRENCY_THREADS"
 
 # Process parameters
 while [[ "$#" -gt 0 ]]; do
@@ -79,6 +82,14 @@ else
   echo "Using standard precision (not using BF16)"
 fi
 
+# Reduce memory usage for CPU training
+if [ "$USE_CUDA" != "True" ]; then
+  MAX_SEQ_LENGTH="1024"
+  PER_DEVICE_TRAIN_BATCH_SIZE="1"
+  GRADIENT_ACCUMULATION_STEPS="1"
+  echo "CPU training detected: lowering max_seq_length to ${MAX_SEQ_LENGTH}, batch size to ${PER_DEVICE_TRAIN_BATCH_SIZE}, grad accumulation to ${GRADIENT_ACCUMULATION_STEPS}"
+fi
+
 # Print environment for debugging
 echo "Environment configuration:"
 echo "  CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
@@ -94,7 +105,7 @@ python lpm_kernel/L2/train.py \
   --chat_template_format "chatml" \
   --add_special_tokens False \
   --append_concat_token False \
-  --max_seq_length 2048 \
+  --max_seq_length $MAX_SEQ_LENGTH \
   --num_train_epochs $NUM_TRAIN_EPOCHS \
   --save_total_limit 2 \
   --logging_steps 20 \
@@ -110,8 +121,8 @@ python lpm_kernel/L2/train.py \
   --weight_decay 1e-4 \
   --max_grad_norm 0.3 \
   --output_dir "${MODEL_PERSONAL_DIR}" \
-  --per_device_train_batch_size 2 \
-  --gradient_accumulation_steps $CONCURRENCY_THREADS \
+  --per_device_train_batch_size $PER_DEVICE_TRAIN_BATCH_SIZE \
+  --gradient_accumulation_steps $GRADIENT_ACCUMULATION_STEPS \
   --gradient_checkpointing True \
   --use_reentrant False \
   --use_peft_lora True \
