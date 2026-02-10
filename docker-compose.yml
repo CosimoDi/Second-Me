@@ -23,6 +23,12 @@ services:
       - LOCAL_APP_PORT=8002
       - IN_DOCKER_ENV=1
       - PLATFORM=${PLATFORM:-linux}
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - http_proxy=
+      - https_proxy=
+      - NO_PROXY=localhost,127.0.0.1,backend,host.docker.internal
+      - no_proxy=localhost,127.0.0.1,backend,host.docker.internal
     extra_hosts:
       - "host.docker.internal:host-gateway"
     deploy:
